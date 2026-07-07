@@ -58,6 +58,25 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
 - `components/ShareButton.tsx` — `/app` 상세 상단에 부착. 폴백 3단계:
   ① `GovSupportNative.share`(WebView) → ② `navigator.share` → ③ 클립보드 복사(+실패 시 prompt).
 
+## 크로스플랫폼 설계 원칙 (iOS 출시 계획 있음)
+
+안드로이드 반응을 본 뒤 **iOS(App Store)에도 출시할 계획**이다. 재작업을 피하기 위한 규칙:
+
+1. **기능은 무조건 웹(/app)에 먼저 구현**한다. 네이티브로 내리는 건 웹으로 불가능한 것만
+   (푸시, 공유 시트, Custom Tab). 네이티브 기능 하나 = 플랫폼별 구현 2벌이라는 뜻.
+2. **브릿지 계약은 플랫폼 중립으로 유지**: 웹은 `window.GovSupportNative` 존재 여부만 확인하고
+   호출한다. 계약을 바꾸면 웹 + Android(+ 미래 iOS) 동시 수정 — 함부로 바꾸지 말 것.
+3. **네이티브→웹은 CustomEvent(push) 방식이 표준** (`govsupport:fcmToken`).
+   **웹이 동기 반환값에 의존하는 브릿지 호출을 새로 만들지 말 것** — iOS WKWebView는
+   동기 반환이 안 된다(postMessage 비동기만 가능). 기존 `getFcmToken()`은 Android 전용
+   디버깅 편의 함수로 취급하고 웹 프로덕션 코드에서 사용 금지.
+4. iOS 껍데기를 만들 땐 `WebAppBridge.kt` 상단의 JS 계약 주석이 스펙 원본이다.
+   WKWebView에서는 injected script로 `window.GovSupportNative` shim을 만들어
+   `webkit.messageHandlers`로 위임하면 웹 무수정으로 동작한다.
+5. iOS 진입 시점에 Swift 껍데기 직접 제작 vs Capacitor 통합을 재평가한다
+   (Apple 최소기능정책 4.2가 Google보다 엄격 — 웹뷰 래퍼 거절 리스크 높음.
+   관심공고 저장·마감 알림 설정 등 앱 전용 기능 추가 검토 필요).
+
 ## 주의사항 / 컨벤션
 
 - 주석·UI 텍스트·커뮤니케이션은 한국어.
