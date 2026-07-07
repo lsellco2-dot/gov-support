@@ -14,7 +14,13 @@ function getClient(): SupabaseClient {
           ".env.local에 키를 설정하거나 NEXT_PUBLIC_USE_MOCK=true로 목업 모드를 사용하세요."
       );
     }
-    client = createClient(url, key, { auth: { persistSession: false } });
+    client = createClient(url, key, {
+      auth: { persistSession: false },
+      // Next.js 14는 서버측 GET fetch를 기본 캐시함 → DB 조회가 낡은 결과를 돌려주는 것 방지
+      global: {
+        fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+      },
+    });
   }
   return client;
 }
