@@ -91,9 +91,9 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
 - [ ] **리드 접수 알림** — expert_leads에 insert 시 운영자에게 알림 (이메일/카카오/슬랙 중 택1).
       현재는 Supabase Table Editor를 직접 봐야만 신청을 알 수 있음. 리드가 수익 모델이므로 운영 전 필수.
       (구현 후보: Supabase Database Webhook → 알림 서비스, 또는 /api/leads에서 저장 성공 후 발송)
-- [ ] **리드 파기 루틴** — privacy에 "상담 완료 후 지체 없이 파기, 미진행 시 90일 후 파기"로 약속함.
-      상담 상태 컬럼(예: status: pending/done) 추가 + 완료/90일 경과 리드 삭제 배치(pg_cron 또는 Vercel Cron).
-      법적 약속이므로 leads 폼 실운영 전 필수.
+- [ ] **리드 파기 루틴** — privacy·동의 문구에 "수집일로부터 3개월 보관 후 파기"로 약속함 (2026-07-07 결정).
+      수집 후 3개월 경과한 expert_leads 행 삭제 배치(pg_cron 또는 Vercel Cron) 필요.
+      법적 약속이므로 leads 폼 실운영 전 필수. 마케팅 활용을 원하면 별도 수신동의 체크박스 추가할 것.
 - [ ] privacy/terms 법률 검토 후 확정
 - [ ] mois 어댑터 필터 통과율 로그 확인 후 활성화 판단
 - [ ] 검색 품질 개선 (pg_trgm → 필요 시 형태소 검색)

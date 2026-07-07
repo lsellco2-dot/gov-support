@@ -67,7 +67,7 @@ export default function LeadForm({ announcementId }: { announcementId: number })
         <input type="checkbox" name="consent" required className="mt-0.5 h-4 w-4" />
         <span>
           상담 연결 목적의 개인정보(이름, 연락처) 수집·이용에 동의합니다.
-          수집 항목은 상담 완료 후 지체 없이 파기되며, 자세한 내용은{" "}
+          수집 항목은 수집일로부터 3개월 보관 후 파기되며, 자세한 내용은{" "}
           <a
             href="/privacy"
             target="_blank"
