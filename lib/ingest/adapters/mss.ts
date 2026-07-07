@@ -1,7 +1,10 @@
 import type { SourceAdapter } from "../types";
 import { buildUrl, extractItems, fetchJson, parseRange, pick, toDate } from "./util";
 
-// TODO: 발급 API의 실제 엔드포인트/필드명으로 확정 (샘플 응답 확인 필수)
+// ⚠️ 보류(2026-07-07): 실제 엔드포인트 확인 불가 — 아래 후보는 HTTP 500 반환.
+// 공공데이터포털 "중소벤처기업부_사업공고"(15113297) 활용신청 후 마이페이지의
+// Swagger/요청주소를 확인해 MSS_ENDPOINT 환경변수로 교체할 것.
+// 중기부 공고는 기업마당(bizinfo)·K-Startup이 대부분 커버하므로 우선순위 낮음.
 const ENDPOINT =
   process.env.MSS_ENDPOINT ??
   "https://apis.data.go.kr/1421000/mssBizService/getbizList";

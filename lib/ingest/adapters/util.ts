@@ -56,6 +56,31 @@ export async function fetchJson(url: string): Promise<any> {
   }
 }
 
+/** XML 전용 API(과기부 등)용: <item>...</item> 블록을 평면 객체 배열로 파싱 */
+export async function fetchXmlItems(url: string): Promise<Record<string, string>[]> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  const items: Record<string, string>[] = [];
+  for (const [, block] of Array.from(text.matchAll(/<item>([\s\S]*?)<\/item>/g))) {
+    const obj: Record<string, string> = {};
+    for (const [, tag, val] of Array.from(block.matchAll(/<(\w+)>([^<]*)<\/\1>/g))) {
+      obj[tag] = decodeXmlEntities(val.trim());
+    }
+    items.push(obj);
+  }
+  return items;
+}
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'");
+}
+
 export function buildUrl(base: string, params: Record<string, string | number>) {
   const u = new URL(base);
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v));

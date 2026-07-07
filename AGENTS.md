@@ -13,12 +13,20 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
 - **다음 단계 (우선순위 순)**:
   1. `.env.local`에 새 Supabase 프로젝트의 URL/anon/service_role 키 + `DATA_GO_KR_KEY` + `CRON_SECRET` 채우고
      `NEXT_PUBLIC_USE_MOCK=true` 줄 삭제 → dev 서버 재시작
-  2. 수집 실행: `curl -X POST -H "Authorization: Bearer <CRON_SECRET>" "http://localhost:3000/api/ingest?source=bizinfo"`
-  3. 수집 0건이거나 필드가 비면 **어댑터 필드 확정 작업** (README "배포 전 반드시 할 일" 절 —
-     공공데이터포털 API는 문서와 실제 응답 필드명이 다른 경우가 많음.
-     `lib/ingest/adapters/*.ts`의 ENDPOINT와 `pick()` 후보를 실제 응답 1페이지 받아서 확정)
-  4. Android 첫 빌드: Android Studio로 `android/` 열기 → Gradle Sync (wrapper는 Studio가 생성)
-  5. FCM 활성화: Firebase 콘솔에서 `google-services.json` 받아 `android/app/`에 배치 (`android/README.md` 6단계 절차)
+  2. Vercel 배포 → Android release BASE_URL 교체
+  3. Android 첫 빌드: Android Studio로 `android/` 열기 → Gradle Sync (wrapper는 Studio가 생성)
+  4. FCM 활성화: Firebase 콘솔에서 `google-services.json` 받아 `android/app/`에 배치 (`android/README.md` 6단계 절차)
+
+- **수집원 상태 (2026-07-07 실응답 검증 완료)**:
+  | 소스 | 상태 | 비고 |
+  |---|---|---|
+  | kstartup | ✅ 동작 | 필드 확정 완료, 수집 검증됨 |
+  | mois | ✅ 동작 | 정부24 API(api.odcloud.kr/api/gov24/v3/serviceList), 한글 필드, 사용자구분+키워드로 기업만 필터 |
+  | msit | ✅ 동작 | XML 전용 게시판 API → fetchXmlItems 사용. 마감일 미제공이라 상시(null) 처리 |
+  | bizinfo | 🔶 키 대기 | 기업마당 자체 API. **bizinfo.go.kr에서 crtfcKey 별도 발급** 후 .env.local에 BIZINFO_KEY 설정 |
+  | mss | ⏸ 보류 | 엔드포인트 확인 불가(비공개 스웨거). 활용신청 후 마이페이지 요청주소를 MSS_ENDPOINT로 설정. 우선순위 낮음 |
+- 수집 실행: `curl -X POST -H "Authorization: Bearer <CRON_SECRET>" "http://localhost:3000/api/ingest?source=kstartup,mois,msit"`
+- 수집 상한: 소스당 최신 2,000건 (MAX_PAGES=20 / bizinfo는 searchCnt=2000)
 
 ## 완료된 작업 이력
 
