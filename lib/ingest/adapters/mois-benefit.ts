@@ -10,7 +10,7 @@ const ENDPOINT =
   "https://apis.data.go.kr/1741000/publicServiceList/getPublicServiceList";
 
 const PER_PAGE = 100;
-const MAX_PAGES = 300;
+const MAX_PAGES = 20; // 최신 2,000건까지만 수집 (안전장치 겸용)
 
 export const moisBenefit: SourceAdapter = {
   sourceCode: "mois",

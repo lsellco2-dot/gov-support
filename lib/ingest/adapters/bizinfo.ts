@@ -8,7 +8,7 @@ const ENDPOINT =
   "https://apis.data.go.kr/B553701/bizinfoApi/getBizinfoList"; // TODO: 발급받은 API의 실제 엔드포인트로 교체
 
 const PER_PAGE = 100;
-const MAX_PAGES = 200; // 안전장치
+const MAX_PAGES = 20; // 최신 2,000건까지만 수집 (안전장치 겸용)
 
 export const bizinfo: SourceAdapter = {
   sourceCode: "bizinfo",

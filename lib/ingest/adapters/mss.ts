@@ -7,7 +7,7 @@ const ENDPOINT =
   "https://apis.data.go.kr/1421000/mssBizService/getbizList";
 
 const PER_PAGE = 100;
-const MAX_PAGES = 100;
+const MAX_PAGES = 20; // 최신 2,000건까지만 수집 (안전장치 겸용)
 
 export const mss: SourceAdapter = {
   sourceCode: "mss",

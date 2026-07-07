@@ -7,7 +7,7 @@ const ENDPOINT =
   "https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01";
 
 const PER_PAGE = 100;
-const MAX_PAGES = 100;
+const MAX_PAGES = 20; // 최신순 응답이므로 최근 2,000건까지만 수집 (연 공고량 ~5천건 미만)
 
 export const kstartup: SourceAdapter = {
   sourceCode: "kstartup",
