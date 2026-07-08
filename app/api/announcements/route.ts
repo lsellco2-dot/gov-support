@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const result = await listAnnouncements({
       q: sp.get("q") ?? undefined,
+      audience: (sp.get("audience") as any) ?? "all",
       category: sp.get("category") ? Number(sp.get("category")) : undefined,
       region: sp.get("region") ?? undefined,
       status: (sp.get("status") as any) ?? "open",

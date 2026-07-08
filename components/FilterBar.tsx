@@ -6,10 +6,11 @@ export default function FilterBar({
   defaults,
 }: {
   action: string;
-  defaults: { q?: string; category?: string; region?: string; status?: string; sort?: string };
+  defaults: { q?: string; audience?: string; category?: string; region?: string; status?: string; sort?: string };
 }) {
   return (
     <form action={action} method="get" className="flex flex-wrap items-center gap-2">
+      {defaults.audience && <input type="hidden" name="audience" value={defaults.audience} />}
       <input
         type="search"
         name="q"

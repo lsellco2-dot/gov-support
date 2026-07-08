@@ -38,6 +38,27 @@ export default async function DetailPage({ params }: { params: { id: string } })
           </p>
         )}
 
+        {((item.detail_content && item.detail_content !== item.summary) || item.apply_method || item.documents || item.contact || (item.extra_sections?.length ?? 0) > 0 || (item.attachments?.length ?? 0) > 0) && (
+          <div className="mt-6 space-y-7 border-t border-slate-100 pt-6">
+            <div className="bg-slate-700 px-5 py-4 text-sm font-semibold leading-relaxed text-white">
+              K-Startup에 공고되는 정보는 해당 기관의 요청에 의해 제공됩니다. 사업 신청 시 요청하는 정보는 해당 기관에서 관리되오니 유의해 주세요.
+            </div>
+            <DetailBlock
+              title="상세내용"
+              value={item.detail_content !== item.summary ? item.detail_content : null}
+            />
+            <DetailBlock title="신청방법" value={item.apply_method} />
+            <DetailBlock title="제출서류" value={item.documents} />
+            {item.extra_sections?.map((section) => (
+              <DetailBlock key={section.title} title={section.title} value={section.body} />
+            ))}
+            <DetailBlock title="문의처" value={item.contact} />
+            {(item.attachments?.length ?? 0) > 0 && (
+              <AttachmentList links={item.attachments} />
+            )}
+          </div>
+        )}
+
         {item.detail_url && (
           <a
             href={item.detail_url}
@@ -74,4 +95,73 @@ function Row({ k, v }: { k: string; v: string | null }) {
       <dd className="text-ink">{v ?? "-"}</dd>
     </div>
   );
+}
+
+function DetailBlock({ title, value }: { title: string; value: string | null }) {
+  if (!value) return null;
+  const rows = toDetailRows(value);
+  return (
+    <section className="border-t border-slate-200 pt-5 first:border-t-0 first:pt-0">
+      <h2 className="text-base font-bold text-ink">{title}</h2>
+      <div className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
+        {rows.map((row, index) => (
+          <div
+            key={`${row.label}-${index}`}
+            className="grid gap-2 py-4 text-sm leading-relaxed sm:grid-cols-[150px_1fr] sm:gap-6"
+          >
+            {row.body ? (
+              <>
+                <h3 className="font-bold text-ink">{row.label}</h3>
+                <p className="whitespace-pre-line text-slate-700">{row.body}</p>
+              </>
+            ) : (
+              <p className="whitespace-pre-line font-semibold text-slate-700 sm:col-span-2">{row.label}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AttachmentList({ links }: { links: { label: string; url: string }[] }) {
+  return (
+    <section className="border-t border-slate-200 pt-5">
+      <h2 className="text-base font-bold text-ink">관련 링크/자료</h2>
+      <ul className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
+        {links.map((link) => (
+          <li
+            key={`${link.label}-${link.url}`}
+            className="flex flex-col gap-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span className="flex min-w-0 items-start gap-2 text-slate-700">
+              <span className="mt-0.5 text-lg leading-none text-slate-400">↗</span>
+              <span className="break-words">{link.label}</span>
+            </span>
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-slate-300 px-4 text-sm font-semibold text-ink hover:border-primary hover:text-primary"
+            >
+              열기
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function toDetailRows(value: string) {
+  const blocks = value
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return blocks.map((block) => {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    if (lines.length <= 1) return { label: lines[0] ?? block, body: "" };
+    return { label: lines[0], body: lines.slice(1).join("\n") };
+  });
 }

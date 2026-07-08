@@ -3,6 +3,7 @@ import { adapters } from "./adapters";
 import { mapCategories } from "./category";
 import { contentHash } from "./hash";
 import { SOURCE_ID, type NormalizedAnnouncement } from "./types";
+import { sanitizeDisplayText } from "@/lib/text/sanitize";
 
 const CHUNK = 500;
 
@@ -65,21 +66,31 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
 }
 
 function toRow(n: NormalizedAnnouncement) {
+  const clean: NormalizedAnnouncement = {
+    ...n,
+    title: sanitizeDisplayText(n.title),
+    organization: sanitizeDisplayText(n.organization),
+    region: sanitizeDisplayText(n.region),
+    target: sanitizeDisplayText(n.target),
+    supportType: sanitizeDisplayText(n.supportType),
+    summary: sanitizeDisplayText(n.summary),
+  };
+
   return {
-    source_id: SOURCE_ID[n.sourceCode],
-    source_key: n.sourceKey,
-    title: n.title,
-    organization: n.organization,
-    category_ids: mapCategories(n),
-    region: n.region ?? "전국",
-    target: n.target,
-    support_type: n.supportType,
-    summary: n.summary,
-    apply_start: n.applyStart,
-    apply_end: n.applyEnd,
-    detail_url: n.detailUrl,
-    content_hash: contentHash(n),
-    raw_json: n.raw,
+    source_id: SOURCE_ID[clean.sourceCode],
+    source_key: clean.sourceKey,
+    title: clean.title,
+    organization: clean.organization,
+    category_ids: mapCategories(clean),
+    region: clean.region ?? "전국",
+    target: clean.target,
+    support_type: clean.supportType,
+    summary: clean.summary,
+    apply_start: clean.applyStart,
+    apply_end: clean.applyEnd,
+    detail_url: clean.detailUrl,
+    content_hash: contentHash(clean),
+    raw_json: clean.raw,
     updated_at: new Date().toISOString(),
   };
 }
