@@ -1,8 +1,17 @@
 # AGENTS.md — 작업 인수인계 (2026-07-07 저녁 기준, Claude Code → Codex)
 
+> ⚠️ **작업 위치 (Codex는 반드시 이 폴더를 열 것)**:
+> `C:\Users\mucsi\OneDrive\Documents\gov-support\gov-support`
+> 이 폴더가 프로젝트 루트다(package.json·app·android·supabase 여기 있음). git 저장소 루트도 여기.
+> Honsulmap / contract-mvp / honsulmap-platform 은 **다른 프로젝트**이니 열지 말 것.
+
 정부지원사업 공고 통합 조회서비스 MVP "정부지원비서".
 Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebView 전용 UI.
 전체 구조와 수집 파이프라인 설명은 `README.md`, Android 앱은 `android/README.md` 참고.
+
+> 서비스 표시명은 **"정부지원비서"** (2026-07-07 "지원사업 한곳에"에서 변경, 커밋 907b4e5).
+> 안드로이드 패키지명 `com.govsupport.app`·폴더명 `gov-support`는 내부 식별자라 그대로 유지
+> (표시명과 무관, 도메인 확정 시점에만 재검토 — android/README.md 릴리즈 체크리스트 참고).
 
 ## 현재 상태 (여기서 이어갈 것)
 
@@ -69,6 +78,15 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
 ### 4. 공유 버튼
 - `components/ShareButton.tsx` — `/app` 상세 상단에 부착. 폴백 3단계:
   ① `GovSupportNative.share`(WebView) → ② `navigator.share` → ③ 클립보드 복사(+실패 시 prompt).
+
+### 5. Supabase 연결 + 수집원 확정 (2026-07-07)
+- Supabase 실연결, K-Startup/mois/msit 수집 가동, DB 총 2,695건. (상세: 상단 "현재 상태" 참고)
+- Next 14 fetch 캐시 버그 수정 (lib/supabase/*.ts의 cache:no-store — 제거 금지).
+
+### 6. 서비스명 변경 (2026-07-07, 커밋 907b4e5)
+- "지원사업 한곳에" → **"정부지원비서"**. 9개 파일의 표시명·메타데이터·안드로이드 app_name·
+  법적문서·README 전체를 변경. `grep "지원사업 한곳에"` 결과 0건 확인.
+- 내부 식별자(패키지명 `com.govsupport.app`, 폴더명 `gov-support`)는 의도적으로 미변경.
 
 ## 크로스플랫폼 설계 원칙 (iOS 출시 계획 있음)
 
