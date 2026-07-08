@@ -72,8 +72,8 @@ export const REGIONS = [
   "경기","강원","충북","충남","전북","전남","경북","경남","제주",
 ] as const;
 
+const DEFAULT_SIZE = 10;
 const MAX_SIZE = 50;
-const AUDIENCE_BATCH_SIZE = 1000;
 
 const AUDIENCE_KEYWORDS: Record<Exclude<AudienceGroup, "all">, string[]> = {
   business: [
@@ -152,26 +152,23 @@ function listFromFixtures(p: ListParams, page: number, size: number) {
 
 /** 목록 조회 — 중복 제거된 뷰(announcements_public) 기준 */
 export async function listAnnouncements(p: ListParams) {
-  const page = Math.max(1, p.page ?? 1);
-  const size = Math.min(MAX_SIZE, Math.max(1, p.size ?? 20));
+  const page = positiveInt(p.page, 1);
+  const size = Math.min(MAX_SIZE, positiveInt(p.size, DEFAULT_SIZE));
   const from = (page - 1) * size;
 
   if (USE_MOCK) return listFromFixtures(p, page, size);
 
-  if (p.audience && p.audience !== "all") {
-    return listAnnouncementsByAudience(p, page, size);
-  }
-
   let q = supabaseAnon
     .from("announcements_public")
     .select(
-      "id,source_id,title,organization,category_ids,region,target,support_type,apply_start,apply_end,detail_url,status,created_at",
+      "id,source_id,title,organization,category_ids,region,target,support_type,summary,apply_start,apply_end,detail_url,status,created_at",
       { count: "exact" }
     );
 
   const status = p.status ?? "open";
   if (status !== "all") q = q.eq("status", status);
-  if (p.q) q = q.ilike("title", `%${p.q}%`);
+  q = applyTextSearch(q, p.q);
+  q = applyAudienceFilter(q, p.audience);
   if (p.category) q = q.contains("category_ids", [p.category]);
   if (p.region && p.region !== "전국") q = q.in("region", [p.region, "전국"]);
 
@@ -193,114 +190,51 @@ export async function listAnnouncements(p: ListParams) {
   };
 }
 
-async function listAnnouncementsByAudience(
-  p: ListParams,
-  page: number,
-  size: number
-) {
-  let q = supabaseAnon
-    .from("announcements")
-    .select(
-      "id,source_id,source_key,title,organization,category_ids,region,target,support_type,summary,apply_start,apply_end,detail_url,content_hash,created_at,raw_json"
-    )
-    .order("id", { ascending: true });
-
-  if (p.q) q = q.ilike("title", `%${p.q}%`);
-  if (p.category) q = q.contains("category_ids", [p.category]);
-  if (p.region && p.region !== "전국") q = q.in("region", [p.region, "전국"]);
-
-  const rows: AudienceAnnouncementRecord[] = [];
-  for (let from = 0; ; from += AUDIENCE_BATCH_SIZE) {
-    const { data, error } = await q.range(from, from + AUDIENCE_BATCH_SIZE - 1);
-    if (error) throw new Error(error.message);
-    rows.push(...((data ?? []) as AudienceAnnouncementRecord[]));
-    if (!data || data.length < AUDIENCE_BATCH_SIZE) break;
-  }
-
-  let filtered = dedupeAnnouncementRecords(rows)
-    .map(toAnnouncementRow)
-    .filter((row) => matchesAudience(audienceText(row), p.audience!));
-
-  const status = p.status ?? "open";
-  if (status !== "all") filtered = filtered.filter((row) => row.status === status);
-
-  sortAnnouncementRows(filtered, p.sort);
-
-  const from = (page - 1) * size;
-  return {
-    items: filtered.slice(from, from + size).map(stripRawJson),
-    total: filtered.length,
-    page,
-    size,
-  };
-}
-
-type AudienceAnnouncementRecord = AnnouncementRecord & {
-  content_hash: string;
-};
-
-function dedupeAnnouncementRecords(rows: AudienceAnnouncementRecord[]) {
-  const map = new Map<string, AudienceAnnouncementRecord>();
-  for (const row of rows) {
-    const key = row.content_hash || `${row.source_id}:${row.source_key}`;
-    const prev = map.get(key);
-    if (!prev || row.source_id < prev.source_id) map.set(key, row);
-  }
-  return Array.from(map.values());
-}
-
-function toAnnouncementRow(row: AudienceAnnouncementRecord): AnnouncementRow & { raw_json?: unknown } {
-  return {
-    id: row.id,
-    source_id: row.source_id,
-    source_key: row.source_key,
-    title: sanitizeDisplayText(row.title),
-    organization: sanitizeDisplayText(row.organization),
-    category_ids: row.category_ids,
-    region: sanitizeDisplayText(row.region),
-    target: sanitizeDisplayText(row.target),
-    support_type: sanitizeDisplayText(row.support_type),
-    summary: sanitizeDisplayText(row.summary),
-    apply_start: row.apply_start,
-    apply_end: row.apply_end,
-    detail_url: row.detail_url,
-    status: row.apply_end === null || row.apply_end >= todayKst() ? "open" : "closed",
-    created_at: row.created_at,
-    raw_json: row.raw_json,
-  };
-}
-
-function sortAnnouncementRows(rows: AnnouncementRow[], sort?: ListParams["sort"]) {
-  if (sort === "latest") {
-    rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
-    return;
-  }
-
-  rows.sort((a, b) => {
-    if (a.apply_end === null && b.apply_end === null) return 0;
-    if (a.apply_end === null) return 1;
-    if (b.apply_end === null) return -1;
-    return a.apply_end.localeCompare(b.apply_end);
-  });
-}
-
-function audienceText(row: AnnouncementRow & { raw_json?: unknown }) {
-  const raw = row.raw_json ? JSON.stringify(unwrapRaw(row.raw_json)) : "";
-  return [row.title, row.target, row.support_type, row.summary, raw]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function stripRawJson(row: AnnouncementRow & { raw_json?: unknown }): AnnouncementRow {
-  const { raw_json: _rawJson, ...rest } = row;
-  return rest;
-}
-
 function matchesAudience(text: string, audience: AudienceGroup) {
   if (audience === "all") return true;
   const keywords = AUDIENCE_KEYWORDS[audience];
   const haystack = text.toLowerCase();
   return keywords.some((keyword) => haystack.includes(keyword.toLowerCase()));
+}
+
+function applyTextSearch<T extends { or: (filters: string) => T }>(query: T, value?: string) {
+  const term = ilikeTerm(value);
+  if (!term) return query;
+  return query.or(searchFilters(term).join(","));
+}
+
+function applyAudienceFilter<T extends { or: (filters: string) => T }>(
+  query: T,
+  audience?: AudienceGroup
+) {
+  if (!audience || audience === "all") return query;
+
+  const filters = AUDIENCE_KEYWORDS[audience].flatMap((keyword) => {
+    const term = ilikeTerm(keyword);
+    return term ? searchFilters(term) : [];
+  });
+
+  return filters.length > 0 ? query.or(filters.join(",")) : query;
+}
+
+function searchFilters(term: string) {
+  return [
+    `title.ilike.${term}`,
+    `organization.ilike.${term}`,
+    `target.ilike.${term}`,
+    `support_type.ilike.${term}`,
+    `summary.ilike.${term}`,
+  ];
+}
+
+function ilikeTerm(value?: string) {
+  const cleaned = value?.trim().replace(/[,%()]/g, " ");
+  return cleaned ? `%${cleaned}%` : null;
+}
+
+function positiveInt(value: number | undefined, fallback: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.floor(value));
 }
 
 export async function getAnnouncement(id: number) {

@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       status: (sp.get("status") as any) ?? "open",
       sort: (sp.get("sort") as any) ?? "deadline",
       page: sp.get("page") ? Number(sp.get("page")) : 1,
-      size: sp.get("size") ? Number(sp.get("size")) : 20,
+      size: sp.get("size") ? Number(sp.get("size")) : undefined,
     });
     return NextResponse.json(result);
   } catch (e: any) {
