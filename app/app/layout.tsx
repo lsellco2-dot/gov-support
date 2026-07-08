@@ -7,7 +7,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex h-12 items-center justify-center">
           <Link href="/app" className="text-base font-bold text-primary">
-            지원사업 한곳에
+            정부지원비서
           </Link>
         </div>
       </header>

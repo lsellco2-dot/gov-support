@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 // 개인정보 보호책임자를 실제 값으로 채워야 합니다.
 
 export const metadata: Metadata = {
-  title: "개인정보처리방침 — 지원사업 한곳에",
+  title: "개인정보처리방침 — 정부지원비서",
 };
 
 export default function PrivacyPage() {
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       </p>
 
       <p className="mt-5 text-sm leading-relaxed text-slate-600">
-        &lsquo;지원사업 한곳에&rsquo;(이하 &ldquo;서비스&rdquo;)는 「개인정보 보호법」에 따라
+        &lsquo;정부지원비서&rsquo;(이하 &ldquo;서비스&rdquo;)는 「개인정보 보호법」에 따라
         이용자의 개인정보를 보호하고 관련 고충을 신속하게 처리하기 위해 다음과 같이
         개인정보처리방침을 수립·공개합니다.
       </p>

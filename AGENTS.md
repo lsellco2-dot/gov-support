@@ -1,6 +1,6 @@
 # AGENTS.md — 작업 인수인계 (2026-07-07 저녁 기준, Claude Code → Codex)
 
-정부지원사업 공고 통합 조회서비스 MVP "지원사업 한곳에".
+정부지원사업 공고 통합 조회서비스 MVP "정부지원비서".
 Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebView 전용 UI.
 전체 구조와 수집 파이프라인 설명은 `README.md`, Android 앱은 `android/README.md` 참고.
 

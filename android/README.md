@@ -1,4 +1,4 @@
-# 지원사업 한곳에 — Android WebView 앱
+# 정부지원비서 — Android WebView 앱
 
 Next.js 웹의 `/app` 경로를 감싸는 Kotlin WebView 앱입니다.
 네이티브 기능은 **푸시(FCM)** 와 **공유 인텐트** 2개 (Google Play 최소기능 정책 대비).

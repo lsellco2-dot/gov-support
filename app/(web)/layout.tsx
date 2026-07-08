@@ -6,7 +6,7 @@ export default function WebLayout({ children }: { children: React.ReactNode }) {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <Link href="/" className="text-lg font-bold text-primary">
-            지원사업 한곳에
+            정부지원비서
           </Link>
           <span className="text-xs text-slate-400">
             중기부 · 창진원 · 행안부 · 과기부 공고 통합조회

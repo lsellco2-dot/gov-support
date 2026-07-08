@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 // 정식 오픈 전 검토를 거쳐 사업자 정보와 분쟁 관할 등을 확정해야 합니다.
 
 export const metadata: Metadata = {
-  title: "이용약관 — 지원사업 한곳에",
+  title: "이용약관 — 정부지원비서",
 };
 
 export default function TermsPage() {
@@ -19,7 +19,7 @@ export default function TermsPage() {
 
       <Section title="제1조 (목적)">
         <p>
-          이 약관은 &lsquo;지원사업 한곳에&rsquo;(이하 &ldquo;서비스&rdquo;)가 제공하는
+          이 약관은 &lsquo;정부지원비서&rsquo;(이하 &ldquo;서비스&rdquo;)가 제공하는
           정부지원사업 공고 통합 조회 및 전문가 상담 연결 서비스의 이용 조건과 절차, 서비스와
           이용자의 권리·의무를 규정함을 목적으로 합니다.
         </p>
