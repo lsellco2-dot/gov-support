@@ -1,4 +1,4 @@
-# AGENTS.md — 작업 인수인계 (2026-07-07 기준)
+# AGENTS.md — 작업 인수인계 (2026-07-07 저녁 기준, Claude Code → Codex)
 
 정부지원사업 공고 통합 조회서비스 MVP "지원사업 한곳에".
 Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebView 전용 UI.
@@ -6,13 +6,17 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
 
 ## 현재 상태 (여기서 이어갈 것)
 
-- **앱은 mock 모드로 동작 중**: `.env.local`의 `NEXT_PUBLIC_USE_MOCK=true` →
-  `lib/query/fixtures.ts`의 목업 40건으로 전체 UI가 돈다. Supabase 키 불필요.
-- **Supabase 새 프로젝트 생성 완료** (리전을 오세아니아→싱가포르/서울로 옮기기 위해 재생성).
-  `supabase/schema.sql` 실행까지 완료된 상태.
+- **Supabase 연결 완료, 실데이터로 동작 중** (mock 모드 해제됨).
+  `.env.local`에 새 프로젝트(hnjikcpmwfahfvbasiyq, 새 형식 sb_publishable/sb_secret 키) +
+  DATA_GO_KR_KEY + CRON_SECRET 설정 완료. schema.sql 실행 완료.
+- **DB 현황 (2026-07-07)**: 총 2,695건 (kstartup 2,439 / mois 246 / msit 10), 모집중 543건.
+  마감일 2026년 이전 옛 공고는 정리함(사용자 승인 하에 7,560건 삭제).
+- **주의: Next 14 fetch 캐시 버그 수정됨** — supabase 클라이언트에 cache:no-store 강제
+  (lib/supabase/anon.ts·server.ts). 이 옵션을 제거하면 DB 조회가 낡은 결과에 갇힌다.
+- mock 모드는 `.env.local`에 `NEXT_PUBLIC_USE_MOCK=true`를 다시 넣으면 언제든 복귀 가능.
 - **다음 단계 (우선순위 순)**:
-  1. `.env.local`에 새 Supabase 프로젝트의 URL/anon/service_role 키 + `DATA_GO_KR_KEY` + `CRON_SECRET` 채우고
-     `NEXT_PUBLIC_USE_MOCK=true` 줄 삭제 → dev 서버 재시작
+  1. (사용자 작업) 기업마당 인증키 발급: bizinfo.go.kr → 활용정보 → 정책정보 개방(OpenAPI)
+     → 발급된 키를 `.env.local`에 `BIZINFO_KEY=키` 추가 → `?source=bizinfo` 수집 실행·검증
   2. Vercel 배포 → Android release BASE_URL 교체
   3. Android 첫 빌드: Android Studio로 `android/` 열기 → Gradle Sync (wrapper는 Studio가 생성)
   4. FCM 활성화: Firebase 콘솔에서 `google-services.json` 받아 `android/app/`에 배치 (`android/README.md` 6단계 절차)
