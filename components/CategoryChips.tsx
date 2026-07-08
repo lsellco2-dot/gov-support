@@ -6,7 +6,7 @@ export default function CategoryChips({ ids }: { ids: number[] }) {
   return (
     <span className="flex flex-wrap gap-1">
       {names.map((n) => (
-        <span key={n} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+        <span key={n} className="rounded-badge bg-primary-light px-2 py-0.5 text-[11px] font-medium text-primary-dark">
           {n}
         </span>
       ))}

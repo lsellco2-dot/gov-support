@@ -23,7 +23,7 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
 
   return (
     <div>
-      <Link href="/" className="text-sm text-slate-500 hover:text-primary">
+      <Link href="/" className="text-sm text-subtle hover:text-primary">
         ← 처음으로
       </Link>
 
@@ -31,15 +31,15 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
         <AudienceEntryCards basePath="/announcements" active={audience} params={searchParams} />
       </section>
 
-      <div className="mt-5">
+      <div className="mt-4">
         <FilterBar action="/announcements" defaults={searchParams} />
       </div>
 
-      <p className="mt-4 text-sm text-slate-500">
+      <p className="mt-5 text-sm text-subtle">
         총 <b className="text-ink tabular-nums">{total.toLocaleString()}</b>건
       </p>
       {items.length === 0 ? (
-        <div className="mt-8 rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+        <div className="mt-8 rounded-lg border border-dashed border-line bg-white p-10 text-center text-sm text-subtle">
           조건에 맞는 공고가 없습니다. 검색어나 필터를 바꿔 보세요.
         </div>
       ) : (

@@ -23,7 +23,7 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
 
   return (
     <div>
-      <Link href="/app" className="text-sm text-slate-500">
+      <Link href="/app" className="text-sm text-subtle">
         ← 처음으로
       </Link>
 
@@ -35,12 +35,12 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
         <FilterBar action="/app/announcements" defaults={searchParams} />
       </div>
 
-      <p className="mt-3 text-xs text-slate-500">
-        모집중 <b className="tabular-nums">{total.toLocaleString()}</b>건 · 마감 임박순
+      <p className="mt-3 text-xs text-subtle">
+        모집중 <b className="text-ink tabular-nums">{total.toLocaleString()}</b>건 · 마감 임박순
       </p>
       <div className="mt-2 space-y-2.5">
         {items.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-subtle">
             조건에 맞는 공고가 없습니다.
           </div>
         ) : (

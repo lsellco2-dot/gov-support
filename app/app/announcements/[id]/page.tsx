@@ -17,29 +17,29 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
   return (
     <article>
       <div className="flex items-center justify-between">
-        <Link href="/app" className="text-sm text-slate-500">← 목록으로</Link>
+        <Link href="/app/announcements" className="text-sm text-subtle">← 목록으로</Link>
         <ShareButton title={item.title} />
       </div>
-      <div className="mt-2 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="mt-2 rounded-lg border border-line bg-white p-4">
         <div className="flex items-start justify-between gap-2">
-          <h1 className="text-base font-bold leading-snug">{item.title}</h1>
+          <h1 className="text-base font-bold leading-snug text-ink">{item.title}</h1>
           <DDayBadge applyEnd={item.apply_end} />
         </div>
         <div className="mt-2"><CategoryChips ids={item.category_ids} /></div>
-        <div className="mt-4 space-y-2 text-sm">
-          <p><span className="text-slate-400">기관</span> {item.organization ?? "-"}</p>
-          <p><span className="text-slate-400">지역</span> {item.region ?? "전국"}</p>
-          <p><span className="text-slate-400">대상</span> {item.target ?? "-"}</p>
-          <p><span className="text-slate-400">기간</span> {item.apply_start ?? "?"} ~ {item.apply_end ?? "상시"}</p>
-        </div>
+        <dl className="mt-4 space-y-2 rounded-lg border border-line bg-slate-50 p-3 text-sm">
+          <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">기관</dt><dd className="text-ink">{item.organization ?? "-"}</dd></div>
+          <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">지역</dt><dd className="text-ink">{item.region ?? "전국"}</dd></div>
+          <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">대상</dt><dd className="text-ink">{item.target ?? "-"}</dd></div>
+          <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">기간</dt><dd className="text-ink">{item.apply_start ?? "?"} ~ {item.apply_end ?? "상시"}</dd></div>
+        </dl>
         {item.summary && (
-          <p className="mt-4 whitespace-pre-line rounded-md bg-slate-50 p-3 text-sm leading-relaxed text-slate-700">
+          <p className="mt-4 whitespace-pre-line rounded-lg border-l-4 border-primary bg-primary-light p-3 text-sm leading-relaxed text-ink">
             {item.summary}
           </p>
         )}
         {((item.detail_content && item.detail_content !== item.summary) || item.apply_method || item.documents || item.contact || (item.extra_sections?.length ?? 0) > 0 || (item.attachments?.length ?? 0) > 0) && (
-          <div className="mt-5 space-y-5 border-t border-slate-100 pt-5">
-            <div className="bg-slate-700 px-4 py-3 text-xs font-semibold leading-relaxed text-white">
+          <div className="mt-5 space-y-5 border-t border-line pt-5">
+            <div className="rounded-lg border-l-4 border-info bg-[#EAF3FB] px-4 py-3 text-xs leading-relaxed text-ink">
               K-Startup 공고 정보는 해당 기관 요청에 의해 제공됩니다. 신청 정보는 해당 기관에서 관리됩니다.
             </div>
             <DetailBlock
@@ -60,7 +60,7 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
         {item.detail_url && (
           <a
             href={item.detail_url}
-            className="mt-4 flex h-11 items-center justify-center rounded-md border border-primary text-sm font-semibold text-primary"
+            className="mt-4 flex h-12 items-center justify-center rounded-md border border-primary text-sm font-semibold text-primary"
           >
             공고 원문 보기 →
           </a>
@@ -70,9 +70,9 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
         </p>
       </div>
 
-      <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-bold">전문가 무료 상담</h2>
-        <p className="mt-1 text-xs text-slate-500">신청 자격 확인부터 서류 준비까지 도와드립니다.</p>
+      <section className="mt-4 rounded-lg border border-line bg-white p-4">
+        <h2 className="text-base font-bold text-ink">전문가 무료 상담</h2>
+        <p className="mt-1 text-xs text-subtle">신청 자격 확인부터 서류 준비까지 도와드립니다.</p>
         <div className="mt-3"><LeadForm announcementId={item.id} /></div>
       </section>
     </article>

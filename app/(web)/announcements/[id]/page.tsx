@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import DDayBadge from "@/components/DDayBadge";
 import CategoryChips from "@/components/CategoryChips";
 import LeadForm from "@/components/LeadForm";
@@ -14,16 +15,19 @@ export default async function DetailPage({ params }: { params: { id: string } })
 
   return (
     <article className="mx-auto max-w-3xl">
-      <div className="rounded-lg border border-slate-200 bg-white p-6">
+      <Link href="/announcements" className="text-sm text-subtle hover:text-primary">
+        ← 목록으로
+      </Link>
+      <div className="mt-3 rounded-lg border border-line bg-white p-6">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-bold leading-snug">{item.title}</h1>
+          <h1 className="text-xl font-bold leading-snug text-ink">{item.title}</h1>
           <DDayBadge applyEnd={item.apply_end} />
         </div>
         <div className="mt-3">
           <CategoryChips ids={item.category_ids} />
         </div>
 
-        <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+        <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-line bg-slate-50 p-4 text-sm sm:grid-cols-2">
           <Row k="소관/수행기관" v={item.organization} />
           <Row k="지역" v={item.region} />
           <Row k="지원대상" v={item.target} />
@@ -33,14 +37,14 @@ export default async function DetailPage({ params }: { params: { id: string } })
         </dl>
 
         {item.summary && (
-          <p className="mt-5 whitespace-pre-line rounded-md bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
+          <p className="mt-5 whitespace-pre-line rounded-lg border-l-4 border-primary bg-primary-light p-4 text-sm leading-relaxed text-ink">
             {item.summary}
           </p>
         )}
 
         {((item.detail_content && item.detail_content !== item.summary) || item.apply_method || item.documents || item.contact || (item.extra_sections?.length ?? 0) > 0 || (item.attachments?.length ?? 0) > 0) && (
-          <div className="mt-6 space-y-7 border-t border-slate-100 pt-6">
-            <div className="bg-slate-700 px-5 py-4 text-sm font-semibold leading-relaxed text-white">
+          <div className="mt-6 space-y-7 border-t border-line pt-6">
+            <div className="rounded-lg border-l-4 border-info bg-[#EAF3FB] px-5 py-4 text-sm leading-relaxed text-ink">
               K-Startup에 공고되는 정보는 해당 기관의 요청에 의해 제공됩니다. 사업 신청 시 요청하는 정보는 해당 기관에서 관리되오니 유의해 주세요.
             </div>
             <DetailBlock
@@ -64,7 +68,7 @@ export default async function DetailPage({ params }: { params: { id: string } })
             href={item.detail_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-md border border-primary text-sm font-semibold text-primary hover:bg-primary-light sm:w-auto sm:px-6"
+            className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-md border border-primary text-sm font-semibold text-primary transition hover:bg-primary-light sm:w-auto sm:px-6"
           >
             공고 원문 보기 →
           </a>
@@ -75,9 +79,9 @@ export default async function DetailPage({ params }: { params: { id: string } })
         </p>
       </div>
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-base font-bold">이 공고, 전문가와 함께 준비하기</h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <section className="mt-6 rounded-lg border border-line bg-white p-6">
+        <h2 className="text-lg font-bold text-ink">이 공고, 전문가와 함께 준비하기</h2>
+        <p className="mt-1 text-sm text-subtle">
           신청 자격 확인부터 사업계획서까지, 검증된 전문가가 무료로 1차 상담해 드립니다.
         </p>
         <div className="mt-4">
@@ -91,7 +95,7 @@ export default async function DetailPage({ params }: { params: { id: string } })
 function Row({ k, v }: { k: string; v: string | null }) {
   return (
     <div className="flex gap-3">
-      <dt className="w-24 shrink-0 text-slate-400">{k}</dt>
+      <dt className="w-24 shrink-0 font-medium text-subtle">{k}</dt>
       <dd className="text-ink">{v ?? "-"}</dd>
     </div>
   );

@@ -50,17 +50,18 @@ export default function AudienceEntryCards({
           <Link
             key={card.id}
             href={hrefFor(basePath, params, card.id)}
-            className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+            className="group flex flex-col rounded-lg border border-line bg-white p-6 transition hover:border-primary hover:shadow-[0_2px_12px_rgba(37,110,244,0.12)] focus-visible:border-primary"
           >
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-light text-2xl">
+            <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-light text-2xl">
               {card.icon}
             </span>
             <h3 className="mt-4 text-lg font-bold text-ink">{card.title}</h3>
-            <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-500">
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-subtle">
               {card.description}
             </p>
-            <span className="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-white transition group-hover:bg-primary-dark">
+            <span className="mt-5 inline-flex h-12 items-center justify-center gap-1 rounded-md bg-primary px-4 text-sm font-semibold text-white transition group-hover:bg-primary-dark">
               {card.buttonLabel}
+              <span aria-hidden className="transition group-hover:translate-x-0.5">→</span>
             </span>
           </Link>
         ))}
@@ -70,30 +71,40 @@ export default function AudienceEntryCards({
 
   const compact = variant === "compact";
   return (
-    <div className={compact ? "grid grid-cols-1 gap-2" : "grid grid-cols-1 gap-3 md:grid-cols-3"}>
+    <div
+      className={compact ? "flex gap-2 overflow-x-auto pb-1" : "flex flex-wrap gap-2"}
+      role="tablist"
+      aria-label="대상별 공고 분류"
+    >
       {AUDIENCE_CARDS.map((card) => {
         const selected = active === card.id || (!active && card.id === "all");
         return (
           <Link
             key={card.id}
             href={hrefFor(basePath, params, card.id)}
+            role="tab"
+            aria-selected={selected}
             className={[
-              "block rounded-lg border bg-white transition hover:border-primary/50 hover:shadow-sm",
-              compact ? "p-3" : "p-5",
-              selected ? "border-primary ring-2 ring-primary/10" : "border-slate-200",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition",
+              compact ? "h-9" : "h-10",
+              selected
+                ? "border-primary bg-primary text-white"
+                : "border-line bg-white text-subtle hover:border-primary hover:text-primary",
             ].join(" ")}
           >
-            <span className={compact ? "text-sm font-bold text-ink" : "text-base font-bold text-ink"}>
-              {card.icon} {card.title}
-            </span>
-            <p className={compact ? "mt-1 text-xs leading-relaxed text-slate-500" : "mt-2 text-sm leading-relaxed text-slate-500"}>
-              {card.description}
-            </p>
+            <span aria-hidden>{card.icon}</span>
+            {shortLabel(card.id)}
           </Link>
         );
       })}
     </div>
   );
+}
+
+function shortLabel(id: AudienceGroup) {
+  if (id === "business") return "창업·사업자";
+  if (id === "worker") return "취업·직장인";
+  return "전체";
 }
 
 function hrefFor(

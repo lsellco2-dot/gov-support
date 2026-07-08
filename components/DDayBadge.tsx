@@ -2,7 +2,7 @@
 export default function DDayBadge({ applyEnd }: { applyEnd: string | null }) {
   if (!applyEnd) {
     return (
-      <span className="shrink-0 rounded px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-500">
+      <span className="shrink-0 rounded-badge px-2 py-0.5 text-xs font-semibold bg-slate-100 text-subtle">
         상시
       </span>
     );
@@ -12,7 +12,7 @@ export default function DDayBadge({ applyEnd }: { applyEnd: string | null }) {
 
   if (days < 0) {
     return (
-      <span className="shrink-0 rounded px-2 py-0.5 text-xs font-semibold bg-slate-200 text-slate-400">
+      <span className="shrink-0 rounded-badge px-2 py-0.5 text-xs font-semibold bg-slate-200 text-slate-500">
         마감
       </span>
     );
@@ -20,8 +20,8 @@ export default function DDayBadge({ applyEnd }: { applyEnd: string | null }) {
   const urgent = days <= 7;
   return (
     <span
-      className={`shrink-0 rounded px-2 py-0.5 text-xs font-bold tabular-nums ${
-        urgent ? "bg-red-50 text-urgent" : "bg-primary-light text-primary"
+      className={`shrink-0 rounded-badge px-2 py-0.5 text-xs font-bold tabular-nums ${
+        urgent ? "bg-[#FCE8E6] text-urgent" : "bg-primary-light text-primary"
       }`}
     >
       {days === 0 ? "오늘 마감" : `D-${days}`}

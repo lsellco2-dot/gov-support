@@ -4,7 +4,7 @@ import Link from "next/link";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto min-h-screen max-w-md bg-[var(--bg)] pb-16">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur">
         <div className="flex h-12 items-center justify-center">
           <Link href="/app" className="text-base font-bold text-primary">
             정부지원비서
@@ -23,7 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </footer>
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto flex h-14 max-w-md items-stretch border-t border-slate-200 bg-white">
+      <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto flex h-14 max-w-md items-stretch border-t border-line bg-white">
         <Link href="/app" className="flex flex-1 items-center justify-center text-sm font-semibold text-primary">
           홈
         </Link>
