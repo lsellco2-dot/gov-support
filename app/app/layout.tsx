@@ -25,9 +25,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto flex h-14 max-w-md items-stretch border-t border-slate-200 bg-white">
         <Link href="/app" className="flex flex-1 items-center justify-center text-sm font-semibold text-primary">
-          공고
+          홈
         </Link>
-        <Link href="/app?status=open&sort=deadline" className="flex flex-1 items-center justify-center text-sm text-slate-500">
+        <Link href="/app/announcements?audience=all" className="flex flex-1 items-center justify-center text-sm text-slate-500">
+          전체공고
+        </Link>
+        <Link href="/app/announcements?audience=all&status=open&sort=deadline" className="flex flex-1 items-center justify-center text-sm text-slate-500">
           마감임박
         </Link>
       </nav>

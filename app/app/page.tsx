@@ -1,38 +1,23 @@
-import AnnouncementCard from "@/components/AnnouncementCard";
-import FilterBar from "@/components/FilterBar";
-import Pagination from "@/components/Pagination";
-import { listAnnouncements } from "@/lib/query/announcements";
+import AudienceEntryCards from "@/components/AudienceEntryCards";
 
 export const dynamic = "force-dynamic";
 
-type SP = Record<string, string | undefined>;
-
-export default async function AppHome({ searchParams }: { searchParams: SP }) {
-  const { items, total, page, size } = await listAnnouncements({
-    q: searchParams.q,
-    category: searchParams.category ? Number(searchParams.category) : undefined,
-    region: searchParams.region,
-    status: (searchParams.status as any) ?? "open",
-    sort: (searchParams.sort as any) ?? "deadline",
-    page: searchParams.page ? Number(searchParams.page) : 1,
-  });
-
+// 모바일 WebView 첫 화면 = 랜딩. 카드 클릭 시 /app/announcements 목록으로 진입.
+export default function AppHome() {
   return (
     <div>
-      <FilterBar action="/app" defaults={searchParams} />
-      <p className="mt-3 text-xs text-slate-500">
-        모집중 <b className="tabular-nums">{total.toLocaleString()}</b>건 · 마감 임박순
-      </p>
-      <div className="mt-2 space-y-2.5">
-        {items.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-            조건에 맞는 공고가 없습니다.
-          </div>
-        ) : (
-          items.map((item) => <AnnouncementCard key={item.id} item={item} basePath="/app" />)
-        )}
-      </div>
-      <Pagination page={page} size={size} total={total} basePath="/app" params={searchParams} />
+      <section className="rounded-2xl bg-gradient-to-b from-primary-light/60 to-transparent px-4 py-8 text-center">
+        <h1 className="text-lg font-bold leading-snug text-ink">
+          나에게 맞는 정부지원사업을 한눈에
+        </h1>
+        <p className="mt-2 text-xs text-slate-500">
+          창업, 사업, 취업 지원 공고를 쉽게 찾아보세요.
+        </p>
+      </section>
+
+      <section className="mt-5">
+        <AudienceEntryCards basePath="/app/announcements" active="all" params={{}} variant="landing" />
+      </section>
     </div>
   );
 }
