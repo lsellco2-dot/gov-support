@@ -107,13 +107,43 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
    (Apple 최소기능정책 4.2가 Google보다 엄격 — 웹뷰 래퍼 거절 리스크 높음.
    관심공고 저장·마감 알림 설정 등 앱 전용 기능 추가 검토 필요).
 
+## 디자인 시스템 (KRDS 기반) — 새 UI는 반드시 이걸 따를 것
+
+2026-07-07 UI를 KRDS(디지털 정부서비스 UI/UX 가이드라인) 스타일로 정비함(커밋 b304725).
+**새 화면·컴포넌트를 만들 때 색/모서리/간격을 임의로 정하지 말고 아래 토큰·패턴을 재사용할 것.**
+디자인 톤을 바꾸는 변경은 사용자 확인 후 진행.
+
+**색상 토큰 (tailwind.config.ts에 정의, 클래스로만 사용)**
+- `primary`(#256EF4 정부 블루) = 행동의 색. 주요 버튼·선택 상태·링크에만. 남발 금지.
+  `primary-dark`(#0B50D0)=hover, `primary-light`(#ECF2FE)=옅은 배경/칩.
+- `ink`(#1E2124)=본문, `subtle`(#464C53)=보조 텍스트, `line`(#D2D5D9)=테두리.
+- semantic: `urgent`(#DE3412 위험), `open`(#228738 성공), `info`(#0B78CB 안내), `point`(#D63D4A 강조).
+- ⚠️ 새 코드에서 `slate-*`·`text-slate-400/500` 같은 임의 회색 대신 위 토큰(`ink`/`subtle`/`line`)을 쓸 것.
+  (기존 코드에 slate-50 등 배경은 일부 남아있으나 신규는 토큰 우선.)
+
+**형태 규칙 (KRDS)**
+- radius: 카드·입력 `rounded-lg`(8px), 버튼 `rounded-md`(6px), 뱃지 `rounded-badge`(4px, 커스텀 유틸).
+- 버튼 높이: 기본 `h-12`(48px)/보조 `h-11`. 카드 패딩 `p-5`~`p-6`. 넉넉한 여백 유지.
+- 카드=흰 배경 `bg-white` + `border border-line`. hover 시 `border-primary` + 옅은 그림자.
+- 폼: `<label>`(모바일도) 필수, 입력 `border-line` `focus:border-primary`, 접근성 위해 sr-only 라벨이라도 붙일 것.
+
+**재사용 컴포넌트 (새로 만들지 말고 이걸 확장)**
+- 진입 카드/탭: `components/AudienceEntryCards.tsx` (variant: landing/tabs/compact)
+- 필터/검색: `components/FilterBar.tsx` · 목록 카드: `components/AnnouncementCard.tsx`
+- 뱃지: `DDayBadge.tsx`·`CategoryChips.tsx` · 폼: `LeadForm.tsx`
+- 랜딩 히어로 패턴: `app/(web)/page.tsx`, `app/app/page.tsx` 참고.
+
+**주의**: "정부24/공식 정부 서비스"로 오해될 문구·로고·엠블럼 사용 금지. 서비스명은 "정부지원비서".
+KRDS는 시각 스타일만 참고하고 코드를 직접 복붙하지 않음.
+
 ## 주의사항 / 컨벤션
 
 - 주석·UI 텍스트·커뮤니케이션은 한국어.
 - `DATA_GO_KR_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`은 서버 전용 — `NEXT_PUBLIC_` 금지.
 - 사용자 화면 조회는 항상 `announcements_public` 뷰 (content_hash 중복 제거 뷰). 원본 테이블 직접 조회 금지.
 - `expert_leads`/`announcement_events`는 RLS 정책 없음 = API Route(service_role) 경유로만 쓰기.
-- git 저장소 아님 (`git init` 안 된 상태). 버전 관리 시작하려면 init부터.
+- git 저장소임(2026-07-07 init). **도구를 바꿔 작업하기 전 반드시 커밋**해서 미커밋 변경이 섞이지 않게 할 것
+  (Claude↔Codex 전환 시 워크트리 충돌 방지). 커밋 메시지 특수문자(·, 따옴표)는 파일(-F)로 넣으면 안전.
 - 타입 체크: `npx tsc --noEmit`. 테스트 코드는 아직 없음.
 
 ## 설계 검토 중: 카테고리 진입형 UI (2026-07-07 논의)
