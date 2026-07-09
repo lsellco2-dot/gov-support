@@ -1,5 +1,5 @@
 import type { SourceAdapter } from "../types";
-import { buildUrl, extractItems, fetchJson, parseRange, pick, toDate } from "./util";
+import { buildUrl, extractItems, fetchJson, parseRange, pick, stripHtml, toDate } from "./util";
 
 // 기업마당(bizinfo.go.kr) 자체 오픈API — data.go.kr 인증키가 아니라
 // 기업마당 사이트에서 별도 발급하는 crtfcKey가 필요 (BIZINFO_KEY 환경변수).
@@ -54,7 +54,7 @@ export const bizinfo: SourceAdapter = {
       region: pick(raw, ["areaNm", "regionNm"]) ?? "전국",
       target: pick(raw, ["trgetNm", "targetNm", "aplyTrgt"]),
       supportType: pick(raw, ["pldirSportRealmLclasCodeNm", "sportRealmNm", "suptType"]),
-      summary: pick(raw, ["bsnsSumryCn", "sumryCn", "summary"]),
+      summary: stripHtml(pick(raw, ["bsnsSumryCn", "sumryCn", "summary"])),
       applyStart: start1 ?? toDate(pick(raw, ["reqstBeginDe", "applyStart"])),
       applyEnd: end1 ?? toDate(pick(raw, ["reqstEndDe", "applyEnd"])),
       detailUrl,

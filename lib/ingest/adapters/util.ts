@@ -28,9 +28,29 @@ export function toDate(s: string | null): string | null {
 /** '20240101 ~ 20240131' 형태의 기간 문자열 → [start, end] */
 export function parseRange(s: string | null): [string | null, string | null] {
   if (!s) return [null, null];
-  const parts = s.split(/~|∼|-(?=\s*\d{8})/).map((p) => p.trim());
+  const parts = s.split(/\s*(?:~|∼|–|—|\s-\s)\s*/).map((p) => p.trim());
   if (parts.length >= 2) return [toDate(parts[0]), toDate(parts[1])];
   return [toDate(parts[0]), null];
+}
+
+export function stripHtml(value: string | null): string | null {
+  if (!value) return null;
+  return decodeHtmlEntities(value)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s+/g, "\n")
+    .trim();
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'");
 }
 
 /** 공공데이터포털 공통 GET + JSON 파싱 (재시도 1회) */
