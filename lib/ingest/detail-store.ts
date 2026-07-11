@@ -8,11 +8,19 @@ import type { NormalizedAnnouncement } from "./types";
 
 const DETAIL_CONCURRENCY = 3;
 const LOOKUP_CHUNK = 100;
+const EMPTY_SHELL_ERROR = "empty_shell_200";
+const FINAL_EMPTY_SHELL_ATTEMPT = 2;
+const EMPTY_SHELL_RETRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+export const FINAL_EMPTY_SHELL_ERROR = `${EMPTY_SHELL_ERROR}:${FINAL_EMPTY_SHELL_ATTEMPT}`;
 
 interface ExistingDetailState {
   source_key: string;
   detail_source_hash: string | null;
   detail_fetched_at: string | null;
+  detail_fetch_status: string | null;
+  detail_fetch_error: string | null;
+  detail_fetch_attempted_at: string | null;
 }
 
 export interface DetailLookupResult {
@@ -24,6 +32,8 @@ export interface DetailLookupResult {
 export interface DetailStoreResult {
   fetched: number;
   failed: number;
+  emptyShell: number;
+  emptyShellFinalized: number;
 }
 
 export async function loadExistingDetailStates(
@@ -38,7 +48,9 @@ export async function loadExistingDetailStates(
   for (let index = 0; index < sourceKeys.length; index += LOOKUP_CHUNK) {
     const { data, error } = await supabaseAdmin
       .from("announcements")
-      .select("source_key,detail_source_hash,detail_fetched_at")
+      .select(
+        "source_key,detail_source_hash,detail_fetched_at,detail_fetch_status,detail_fetch_error,detail_fetch_attempted_at"
+      )
       .eq("source_id", sourceId)
       .in("source_key", sourceKeys.slice(index, index + LOOKUP_CHUNK));
 
@@ -62,8 +74,35 @@ export function needsDetailFetch(
   existing?: ExistingDetailState
 ) {
   if (!announcement.detailUrl) return false;
-  if (!existing?.detail_fetched_at) return true;
-  return existing.detail_source_hash !== sourcePayloadHash(announcement.raw);
+  if (existing?.detail_fetched_at) {
+    return existing.detail_source_hash !== sourcePayloadHash(announcement.raw);
+  }
+  if (existing?.detail_fetch_error === FINAL_EMPTY_SHELL_ERROR) {
+    return (
+      isOpenOrOngoing(announcement.applyEnd) &&
+      retryIntervalElapsed(existing.detail_fetch_attempted_at)
+    );
+  }
+  return true;
+}
+
+function isOpenOrOngoing(applyEnd: string | null) {
+  return applyEnd === null || applyEnd >= todayKst();
+}
+
+function retryIntervalElapsed(attemptedAt: string | null) {
+  if (!attemptedAt) return true;
+  const attempted = Date.parse(attemptedAt);
+  return !Number.isFinite(attempted) || Date.now() - attempted >= EMPTY_SHELL_RETRY_INTERVAL_MS;
+}
+
+function todayKst() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export async function fetchAndStoreDetails(
@@ -73,6 +112,8 @@ export async function fetchAndStoreDetails(
   let cursor = 0;
   let fetched = 0;
   let failed = 0;
+  let emptyShell = 0;
+  let emptyShellFinalized = 0;
 
   async function worker() {
     while (cursor < announcements.length) {
@@ -108,8 +149,21 @@ export async function fetchAndStoreDetails(
         }
       } catch (error) {
         failed++;
-        const reason =
+        let reason =
           error instanceof DetailFetchError ? error.publicReason : "원문 호출 실패";
+        if (reason === EMPTY_SHELL_ERROR) {
+          emptyShell++;
+          const previousAttempt = await loadEmptyShellAttempt(
+            sourceId,
+            announcement.sourceKey
+          );
+          const nextAttempt = Math.min(
+            FINAL_EMPTY_SHELL_ATTEMPT,
+            previousAttempt + 1
+          );
+          reason = `${EMPTY_SHELL_ERROR}:${nextAttempt}`;
+          if (nextAttempt >= FINAL_EMPTY_SHELL_ATTEMPT) emptyShellFinalized++;
+        }
         console.error(
           `[${announcement.sourceCode}] 상세 수집 실패:`,
           error instanceof Error ? error.message : "unknown error"
@@ -139,7 +193,29 @@ export async function fetchAndStoreDetails(
       () => worker()
     )
   );
-  return { fetched, failed };
+  return { fetched, failed, emptyShell, emptyShellFinalized };
+}
+
+async function loadEmptyShellAttempt(sourceId: number, sourceKey: string) {
+  const { data, error } = await supabaseAdmin
+    .from("announcements")
+    .select("detail_fetch_error")
+    .eq("source_id", sourceId)
+    .eq("source_key", sourceKey)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[detail] 빈 셸 이전 시도 조회 실패:", error.message);
+    return 0;
+  }
+
+  const previous = String(data?.detail_fetch_error ?? "");
+  const recordedAttempt = Number(previous.match(/^empty_shell_200:(\d+)$/)?.[1] ?? 0);
+  if (Number.isInteger(recordedAttempt) && recordedAttempt > 0) {
+    return Math.min(FINAL_EMPTY_SHELL_ATTEMPT, recordedAttempt);
+  }
+  // 이전 버전의 "본문 없음" 기록은 이미 한 번 호출한 빈 셸 공고로 본다.
+  return previous === "본문 없음" ? 1 : 0;
 }
 
 function isMissingDetailSchema(code: string | undefined, message: string) {

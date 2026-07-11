@@ -26,6 +26,18 @@ const SOURCE_SELECTORS: Record<SourceCode, string[]> = {
   msit: [".board_view", ".view_cont", "#contents", "main"],
 };
 
+const KSTARTUP_ALTERNATE_SELECTORS = [
+  ".content",
+  ".sub",
+  ".sub_cont",
+  ".sub-content",
+  ".board_view",
+  ".view_cont",
+  ".view-content",
+  ".view_content",
+  "article",
+];
+
 export interface StoredDetailLink {
   label: string;
   url: string;
@@ -53,20 +65,37 @@ export async function fetchAnnouncementDetail(
   announcement: NormalizedAnnouncement
 ): Promise<FetchedAnnouncementDetail> {
   const initialUrl = validateDetailUrl(announcement.sourceCode, announcement.detailUrl);
-  const { html, finalUrl } = await fetchHtml(initialUrl, announcement.sourceCode);
+  const { html, finalUrl, status } = await fetchHtml(initialUrl, announcement.sourceCode);
   const $ = load(html);
+  const pageSignals = {
+    hasIframe: $("iframe").length > 0,
+    isLoginPage:
+      $("input[type='password']").length > 0 ||
+      $("form[action*='login'],form[action*='lgin']").length > 0,
+    isJavascriptApp: $("#root,#__next,#app,[data-reactroot]").length > 0,
+  };
   removeNonContent($);
 
   const sectionDetails =
     announcement.sourceCode === "kstartup" ? extractKstartupSections($) : emptySections();
   const detailContent =
     sectionDetails.fullText || extractMainText($, SOURCE_SELECTORS[announcement.sourceCode]);
+  const attachments = extractAttachments($, finalUrl);
 
   if (!detailContent || detailContent.length < 20) {
+    if (
+      announcement.sourceCode === "kstartup" &&
+      status === 200 &&
+      isKstartupEmptyShell($, attachments, pageSignals)
+    ) {
+      throw new DetailFetchError(
+        "K-Startup 원문이 본문 없는 빈 셸 응답입니다.",
+        "empty_shell_200"
+      );
+    }
     throw new DetailFetchError("상세 본문을 찾지 못했습니다.", "본문 없음");
   }
 
-  const attachments = extractAttachments($, finalUrl);
   const boundedContent = detailContent.slice(0, MAX_DETAIL_CHARS);
   const contentHash = createHash("sha256")
     .update(
@@ -155,7 +184,11 @@ async function fetchHtml(initialUrl: URL, source: SourceCode) {
     }
 
     const body = await readBoundedBody(response);
-    return { html: decodeHtmlBuffer(body, contentType), finalUrl: currentUrl };
+    return {
+      html: decodeHtmlBuffer(body, contentType),
+      finalUrl: currentUrl,
+      status: response.status,
+    };
   }
 
   throw new DetailFetchError("원문 호출에 실패했습니다.", "원문 호출 실패");
@@ -229,6 +262,37 @@ function extractMainText($: CheerioAPI, selectors: string[]) {
     if (texts.length > 0) return normalizeText(texts.join("\n\n"));
   }
   return elementText($, $("body"));
+}
+
+function isKstartupEmptyShell(
+  $: CheerioAPI,
+  attachments: StoredDetailLink[],
+  signals: { hasIframe: boolean; isLoginPage: boolean; isJavascriptApp: boolean }
+) {
+  const visibleText = elementText($, $("body"));
+  const hasCurrentSelector = hasMeaningfulSelector($, [
+    ".information_list",
+    ...SOURCE_SELECTORS.kstartup,
+  ]);
+  const hasAlternateSelector = hasMeaningfulSelector($, KSTARTUP_ALTERNATE_SELECTORS);
+
+  return (
+    visibleText.length < 20 &&
+    !hasCurrentSelector &&
+    !hasAlternateSelector &&
+    !signals.hasIframe &&
+    attachments.length === 0 &&
+    !signals.isLoginPage &&
+    !signals.isJavascriptApp
+  );
+}
+
+function hasMeaningfulSelector($: CheerioAPI, selectors: string[]) {
+  return selectors.some((selector) =>
+    $(selector)
+      .toArray()
+      .some((element) => elementText($, $(element)).length >= 20)
+  );
 }
 
 function extractKstartupSections($: CheerioAPI) {
