@@ -335,9 +335,8 @@ async function enrichKstartupDetail(detail: AnnouncementDetail) {
 
   const applyTarget = sectionBody(scraped.sections, "신청방법 및 대상");
   const documents = sectionBody(scraped.sections, "제출서류");
-  const support = sectionBody(scraped.sections, "지원내용");
-  const selection = sectionBody(scraped.sections, "선정절차 및 평가방법");
   const contact = sectionBody(scraped.sections, "문의처");
+  const mappedSectionTitles = ["신청방법 및 대상", "제출서류", "문의처"];
 
   return {
     ...detail,
@@ -345,10 +344,10 @@ async function enrichKstartupDetail(detail: AnnouncementDetail) {
     documents: documents ?? detail.documents,
     contact: contact ?? detail.contact,
     attachments: mergeLinks(detail.attachments, scraped.links),
-    extra_sections: [
-      support ? { title: "지원내용", body: support } : null,
-      selection ? { title: "선정절차 및 평가방법", body: selection } : null,
-    ].filter(Boolean) as DetailSection[],
+    extra_sections: scraped.sections.filter(
+      (section) =>
+        !mappedSectionTitles.some((title) => section.title.includes(title))
+    ),
   };
 }
 
