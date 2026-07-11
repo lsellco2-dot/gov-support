@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { loadBuffer, type Cheerio, type CheerioAPI } from "cheerio";
+import { load, type Cheerio, type CheerioAPI } from "cheerio";
 import type { AnyNode } from "domhandler";
 import type { NormalizedAnnouncement, SourceCode } from "./types";
 
@@ -21,7 +21,8 @@ const SOURCE_SELECTORS: Record<SourceCode, string[]> = {
   bizinfo: [".board_view", ".view_cont", ".view-content", "#contents", "main"],
   kstartup: ["#content", "#contents", ".contents", "main"],
   mss: [".board_view", ".view_cont", "#contents", "main"],
-  mois: ["#contents", ".content", "main", "article"],
+  // 정부24 혜택 상세는 .tab-content 패널들이 실제 본문(주요내용/지원대상/지원내용/신청방법)이다.
+  mois: [".tab-content", "#contents", ".content", "main", "article"],
   msit: [".board_view", ".view_cont", "#contents", "main"],
 };
 
@@ -53,7 +54,7 @@ export async function fetchAnnouncementDetail(
 ): Promise<FetchedAnnouncementDetail> {
   const initialUrl = validateDetailUrl(announcement.sourceCode, announcement.detailUrl);
   const { html, finalUrl } = await fetchHtml(initialUrl, announcement.sourceCode);
-  const $ = loadBuffer(html);
+  const $ = load(html);
   removeNonContent($);
 
   const sectionDetails =
@@ -153,10 +154,37 @@ async function fetchHtml(initialUrl: URL, source: SourceCode) {
       throw new DetailFetchError("원문 응답이 HTML이 아닙니다.", "HTML 아님");
     }
 
-    return { html: await readBoundedBody(response), finalUrl: currentUrl };
+    const body = await readBoundedBody(response);
+    return { html: decodeHtmlBuffer(body, contentType), finalUrl: currentUrl };
   }
 
   throw new DetailFetchError("원문 호출에 실패했습니다.", "원문 호출 실패");
+}
+
+// 응답 헤더 → 문서 meta charset → utf-8 순으로 문자셋을 결정해 디코딩한다.
+// (meta charset이 문서 뒷부분에 있는 사이트에서 자동 스니핑이 windows-1252로
+//  잘못 판정해 한글 본문 전체가 깨지는 문제가 있었다.)
+function decodeHtmlBuffer(buffer: Buffer, contentType: string | null) {
+  const headerCharset = contentType?.match(/charset=["']?([\w-]+)/i)?.[1] ?? null;
+  const metaCharset = buffer
+    .subarray(0, 8192)
+    .toString("latin1")
+    .match(/<meta[^>]+charset\s*=\s*["']?([\w-]+)/i)?.[1] ?? null;
+  const charset = normalizeCharset(headerCharset || metaCharset || "utf-8");
+
+  try {
+    return new TextDecoder(charset).decode(buffer);
+  } catch {
+    return new TextDecoder("utf-8").decode(buffer);
+  }
+}
+
+function normalizeCharset(value: string) {
+  const charset = value.toLowerCase();
+  if (charset === "ks_c_5601-1987" || charset === "ksc5601" || charset === "cp949") {
+    return "euc-kr";
+  }
+  return charset;
 }
 
 async function readBoundedBody(response: Response) {
@@ -185,6 +213,9 @@ async function readBoundedBody(response: Response) {
 function removeNonContent($: CheerioAPI) {
   $("script,style,noscript,template,svg,canvas,iframe,nav,header,footer").remove();
   $("[aria-hidden='true'],.blind,.sr-only,.skip,.breadcrumb,.location").remove();
+  // 확인/취소 팝업, 안내 모달 같은 화면에 안 보이는 요소가 본문에 섞이지 않게 제거한다.
+  $("[role='dialog'],[aria-modal='true'],.modal,.popup").remove();
+  $("[style*='display:none'],[style*='display: none'],[style*='display : none']").remove();
 }
 
 function extractMainText($: CheerioAPI, selectors: string[]) {
@@ -261,7 +292,28 @@ function extractAttachments($: CheerioAPI, baseUrl: URL) {
     const href = anchor.attr("href")?.trim();
     if (!href || href.startsWith("#") || href.toLowerCase().startsWith("javascript:")) return;
 
-    const label = normalizeText(anchor.text()) || anchor.attr("title")?.trim() || "첨부파일";
+    const text = normalizeText(anchor.text());
+    const title = normalizeText(anchor.attr("title") ?? "");
+    // "다운로드" 같은 버튼 문구보다 title 속성이나 주변의 실제 파일명을 우선한다.
+    const isGenericText = !text || /^(다운로드|바로보기|내려받기|첨부파일|download|view)$/i.test(text);
+    const isGenericTitle = !title || /^(파일\s?다운로드|다운로드|첨부파일)$/i.test(title);
+    let label = isGenericText && !isGenericTitle ? title : text || title || "첨부파일";
+
+    if (isGenericText && isGenericTitle) {
+      // K-Startup처럼 파일명(.file_bg)이 다운로드 버튼의 상위 항목에 있는 구조 지원.
+      const container = anchor
+        .parents("li,tr,dd,div")
+        .filter((_, parent) => $(parent).find("a.file_bg").length > 0)
+        .first();
+      const siblingName = normalizeText(container.find("a.file_bg").first().text());
+      if (siblingName) label = siblingName;
+    }
+
+    label = normalizeText(
+      label
+        .replace(/^\[?첨부파일\]?\s*/, "")
+        .replace(/(\s*(다운로드|바로보기|내려받기))+$/g, "")
+    ) || "첨부파일";
     const looksLikeFile =
       anchor.is("[download]") ||
       /\.(pdf|hwp|hwpx|doc|docx|xls|xlsx|ppt|pptx|zip)(?:$|[?#])/i.test(href) ||
