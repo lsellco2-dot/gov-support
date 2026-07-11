@@ -53,6 +53,7 @@ export interface AnnouncementDetail extends AnnouncementRow {
   contact: string | null;
   attachments: DetailLink[];
   extra_sections: DetailSection[];
+  detail_fetched_at: string | null;
 }
 
 export interface AnnouncementListResult {
@@ -282,6 +283,12 @@ type AnnouncementRecord = AnnouncementRow & {
   content_hash: string;
   raw_json: unknown;
   updated_at: string;
+  detail_content?: string | null;
+  apply_method?: string | null;
+  documents?: string | null;
+  contact?: string | null;
+  attachments?: unknown;
+  detail_fetched_at?: string | null;
 };
 
 function toDetail(row: AnnouncementRecord): AnnouncementDetail {
@@ -309,17 +316,19 @@ function toDetail(row: AnnouncementRecord): AnnouncementDetail {
     detail_url: safeHttpUrl(row.detail_url),
     status: row.apply_end === null || row.apply_end >= todayKst() ? "open" : "closed",
     created_at: row.created_at,
-    detail_content: sanitizeDisplayText(detailContent),
-    apply_method: buildApplyMethod(raw),
-    documents: sanitizeDisplayText(documents),
-    contact: sanitizeDisplayText(buildContact(raw)),
-    attachments: buildLinks(raw),
+    detail_content: sanitizeDisplayText(cleanText(row.detail_content ?? null) ?? detailContent),
+    apply_method: sanitizeDisplayText(cleanText(row.apply_method ?? null) ?? buildApplyMethod(raw)),
+    documents: sanitizeDisplayText(cleanText(row.documents ?? null) ?? documents),
+    contact: sanitizeDisplayText(cleanText(row.contact ?? null) ?? buildContact(raw)),
+    attachments: mergeLinks(storedLinks(row.attachments), buildLinks(raw)),
     extra_sections: [],
+    detail_fetched_at: row.detail_fetched_at ?? null,
   };
 }
 
 async function enrichKstartupDetail(detail: AnnouncementDetail) {
   if (detail.source_id !== 2 || !detail.detail_url) return detail;
+  if (detail.detail_fetched_at && detail.detail_content) return detail;
 
   const scraped = await fetchKstartupSections(detail.detail_url);
   if (!scraped) return detail;
@@ -445,6 +454,17 @@ function dedupeLinks(links: DetailLink[]) {
     if (seen.has(link.url)) return false;
     seen.add(link.url);
     return true;
+  });
+}
+
+function storedLinks(value: unknown): DetailLink[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const label = sanitizeDisplayText(String(record.label ?? "")).trim();
+    const url = safeHttpUrl(String(record.url ?? ""));
+    return label && url ? [{ label, url }] : [];
   });
 }
 

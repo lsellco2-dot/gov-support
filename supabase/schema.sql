@@ -51,6 +51,18 @@ create table if not exists announcements (
   apply_start date,
   apply_end date,                -- null = 상시/미상
   detail_url text,
+  detail_content text,
+  apply_method text,
+  documents text,
+  contact text,
+  attachments jsonb not null default '[]'::jsonb,
+  detail_content_hash text,
+  detail_source_hash text,
+  detail_fetched_at timestamptz,
+  detail_fetch_attempted_at timestamptz,
+  detail_fetch_status text not null default 'pending'
+    check (detail_fetch_status in ('pending','success','failed')),
+  detail_fetch_error text,
   content_hash text not null,
   raw_json jsonb not null,
   created_at timestamptz default now(),
@@ -62,6 +74,8 @@ create index if not exists idx_ann_end on announcements (apply_end desc nulls la
 create index if not exists idx_ann_category on announcements using gin (category_ids);
 create index if not exists idx_ann_hash on announcements (content_hash);
 create index if not exists idx_ann_title_trgm on announcements using gin (title gin_trgm_ops);
+create index if not exists idx_ann_detail_status
+  on announcements (detail_fetch_status, detail_fetch_attempted_at);
 
 -- 사용자 화면이 조회하는 뷰: 출처 간 중복은 content_hash당 대표 1건만 노출
 -- (source_id 오름차순 = bizinfo > kstartup > ... 우선)

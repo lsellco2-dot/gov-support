@@ -22,6 +22,7 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
       item.extra_sections?.length ||
       item.attachments?.length
   );
+  const hasStoredOriginal = Boolean(item.detail_fetched_at && item.detail_content);
 
   return (
     <article>
@@ -53,19 +54,25 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
         )}
         {hasDetailedInfo && (
           <div className="mt-5 space-y-5 border-t border-line pt-5">
-            <div className="rounded-lg border-l-4 border-info bg-[#EAF3FB] px-4 py-3 text-xs leading-relaxed text-ink">
-              K-Startup 공고 정보는 해당 기관 요청에 의해 제공됩니다. 신청 정보는 해당 기관에서 관리됩니다.
-            </div>
+            {item.source_id === 2 && (
+              <div className="rounded-lg border-l-4 border-info bg-[#EAF3FB] px-4 py-3 text-xs leading-relaxed text-ink">
+                K-Startup 공고 정보는 해당 기관 요청에 의해 제공됩니다. 신청 정보는 해당 기관에서 관리됩니다.
+              </div>
+            )}
             <DetailBlock
               title="상세내용"
               value={item.detail_content !== item.summary ? item.detail_content : null}
             />
-            <DetailBlock title="신청방법" value={item.apply_method} />
-            <DetailBlock title="제출서류" value={item.documents} />
-            {item.extra_sections?.map((section) => (
-              <DetailBlock key={section.title} title={section.title} value={section.body} />
-            ))}
-            <DetailBlock title="문의처" value={item.contact} />
+            {!hasStoredOriginal && (
+              <>
+                <DetailBlock title="신청방법" value={item.apply_method} />
+                <DetailBlock title="제출서류" value={item.documents} />
+                {item.extra_sections?.map((section) => (
+                  <DetailBlock key={section.title} title={section.title} value={section.body} />
+                ))}
+                <DetailBlock title="문의처" value={item.contact} />
+              </>
+            )}
             {(item.attachments?.length ?? 0) > 0 && (
               <AttachmentList links={item.attachments} />
             )}

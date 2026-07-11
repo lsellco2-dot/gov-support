@@ -1,0 +1,310 @@
+import { createHash } from "crypto";
+import { loadBuffer, type Cheerio, type CheerioAPI } from "cheerio";
+import type { AnyNode } from "domhandler";
+import type { NormalizedAnnouncement, SourceCode } from "./types";
+
+const REQUEST_TIMEOUT_MS = 15_000;
+const MAX_REDIRECTS = 3;
+const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const MAX_DETAIL_CHARS = 200_000;
+const MAX_ATTACHMENTS = 50;
+
+const SOURCE_HOSTS: Record<SourceCode, string[]> = {
+  bizinfo: ["bizinfo.go.kr"],
+  kstartup: ["k-startup.go.kr"],
+  mss: ["mss.go.kr", "bizinfo.go.kr", "smba.go.kr", "smes.go.kr", "smtech.go.kr"],
+  mois: ["gov.kr", "gov24.go.kr"],
+  msit: ["msit.go.kr"],
+};
+
+const SOURCE_SELECTORS: Record<SourceCode, string[]> = {
+  bizinfo: [".board_view", ".view_cont", ".view-content", "#contents", "main"],
+  kstartup: ["#content", "#contents", ".contents", "main"],
+  mss: [".board_view", ".view_cont", "#contents", "main"],
+  mois: ["#contents", ".content", "main", "article"],
+  msit: [".board_view", ".view_cont", "#contents", "main"],
+};
+
+export interface StoredDetailLink {
+  label: string;
+  url: string;
+}
+
+export interface FetchedAnnouncementDetail {
+  detailContent: string;
+  applyMethod: string | null;
+  documents: string | null;
+  contact: string | null;
+  attachments: StoredDetailLink[];
+  contentHash: string;
+}
+
+export class DetailFetchError extends Error {
+  constructor(
+    message: string,
+    readonly publicReason: string
+  ) {
+    super(message);
+  }
+}
+
+export async function fetchAnnouncementDetail(
+  announcement: NormalizedAnnouncement
+): Promise<FetchedAnnouncementDetail> {
+  const initialUrl = validateDetailUrl(announcement.sourceCode, announcement.detailUrl);
+  const { html, finalUrl } = await fetchHtml(initialUrl, announcement.sourceCode);
+  const $ = loadBuffer(html);
+  removeNonContent($);
+
+  const sectionDetails =
+    announcement.sourceCode === "kstartup" ? extractKstartupSections($) : emptySections();
+  const detailContent =
+    sectionDetails.fullText || extractMainText($, SOURCE_SELECTORS[announcement.sourceCode]);
+
+  if (!detailContent || detailContent.length < 20) {
+    throw new DetailFetchError("상세 본문을 찾지 못했습니다.", "본문 없음");
+  }
+
+  const attachments = extractAttachments($, finalUrl);
+  const boundedContent = detailContent.slice(0, MAX_DETAIL_CHARS);
+  const contentHash = createHash("sha256")
+    .update(
+      JSON.stringify({
+        detailContent: boundedContent,
+        applyMethod: sectionDetails.applyMethod,
+        documents: sectionDetails.documents,
+        contact: sectionDetails.contact,
+        attachments,
+      })
+    )
+    .digest("hex");
+
+  return {
+    detailContent: boundedContent,
+    applyMethod: sectionDetails.applyMethod,
+    documents: sectionDetails.documents,
+    contact: sectionDetails.contact,
+    attachments,
+    contentHash,
+  };
+}
+
+export function sourcePayloadHash(value: unknown) {
+  return createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
+function validateDetailUrl(source: SourceCode, value: string | null) {
+  if (!value) throw new DetailFetchError("원문 URL이 없습니다.", "원문 URL 없음");
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new DetailFetchError("원문 URL 형식이 잘못됐습니다.", "잘못된 원문 URL");
+  }
+
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    !isAllowedSourceHost(source, url.hostname)
+  ) {
+    throw new DetailFetchError("허용되지 않은 원문 URL입니다.", "허용되지 않은 원문 도메인");
+  }
+  return url;
+}
+
+function isAllowedSourceHost(source: SourceCode, hostname: string) {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  return SOURCE_HOSTS[source].some(
+    (allowed) => host === allowed || host.endsWith(`.${allowed}`)
+  );
+}
+
+async function fetchHtml(initialUrl: URL, source: SourceCode) {
+  let currentUrl = initialUrl;
+
+  for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
+    const response = await fetch(currentUrl, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": "gov-support-detail-collector/1.0",
+      },
+      cache: "no-store",
+      redirect: "manual",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location || redirect === MAX_REDIRECTS) {
+        throw new DetailFetchError("원문 리다이렉트를 처리하지 못했습니다.", "리다이렉트 실패");
+      }
+      currentUrl = validateDetailUrl(source, new URL(location, currentUrl).toString());
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new DetailFetchError(`원문 HTTP ${response.status}`, `HTTP ${response.status}`);
+    }
+
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    if (contentType && !contentType.includes("html")) {
+      throw new DetailFetchError("원문 응답이 HTML이 아닙니다.", "HTML 아님");
+    }
+
+    return { html: await readBoundedBody(response), finalUrl: currentUrl };
+  }
+
+  throw new DetailFetchError("원문 호출에 실패했습니다.", "원문 호출 실패");
+}
+
+async function readBoundedBody(response: Response) {
+  const declaredLength = Number(response.headers.get("content-length") ?? 0);
+  if (declaredLength > MAX_HTML_BYTES) {
+    throw new DetailFetchError("원문 응답 크기가 제한을 초과했습니다.", "원문 크기 초과");
+  }
+  if (!response.body) return Buffer.from(await response.arrayBuffer());
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_HTML_BYTES) {
+      await reader.cancel();
+      throw new DetailFetchError("원문 응답 크기가 제한을 초과했습니다.", "원문 크기 초과");
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total);
+}
+
+function removeNonContent($: CheerioAPI) {
+  $("script,style,noscript,template,svg,canvas,iframe,nav,header,footer").remove();
+  $("[aria-hidden='true'],.blind,.sr-only,.skip,.breadcrumb,.location").remove();
+}
+
+function extractMainText($: CheerioAPI, selectors: string[]) {
+  for (const selector of selectors) {
+    const matches = $(selector);
+    if (matches.length === 0) continue;
+    const texts = matches
+      .toArray()
+      .map((element) => elementText($, $(element)))
+      .filter((text) => text.length >= 20);
+    if (texts.length > 0) return normalizeText(texts.join("\n\n"));
+  }
+  return elementText($, $("body"));
+}
+
+function extractKstartupSections($: CheerioAPI) {
+  const sections = $(".information_list")
+    .toArray()
+    .map((element) => {
+      const root = $(element);
+      const title = normalizeText(root.find(".title").first().text());
+      const body = elementText($, root.find(".dot_list").length ? root.find(".dot_list") : root);
+      return title && body ? { title, body } : null;
+    })
+    .filter(Boolean) as Array<{ title: string; body: string }>;
+
+  const find = (title: string) =>
+    sections.find((section) => section.title.includes(title))?.body ?? null;
+
+  return {
+    fullText: sections.map((section) => `${section.title}\n${section.body}`).join("\n\n"),
+    applyMethod: find("신청방법 및 대상"),
+    documents: find("제출서류"),
+    contact: find("문의처"),
+  };
+}
+
+function emptySections() {
+  return {
+    fullText: "",
+    applyMethod: null,
+    documents: null,
+    contact: null,
+  };
+}
+
+function elementText($: CheerioAPI, root: Cheerio<AnyNode>) {
+  const clone = root.clone();
+  clone.find("br").replaceWith("\n");
+  clone
+    .find("h1,h2,h3,h4,h5,h6,p,li,dt,dd,tr,section,article")
+    .each((_, element) => {
+      $(element).append("\n");
+    });
+  return normalizeText(clone.text());
+}
+
+function normalizeText(value: string) {
+  return value
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function extractAttachments($: CheerioAPI, baseUrl: URL) {
+  const links: StoredDetailLink[] = [];
+  const seen = new Set<string>();
+
+  $("a[href]").each((_, element) => {
+    if (links.length >= MAX_ATTACHMENTS) return;
+    const anchor = $(element);
+    const href = anchor.attr("href")?.trim();
+    if (!href || href.startsWith("#") || href.toLowerCase().startsWith("javascript:")) return;
+
+    const label = normalizeText(anchor.text()) || anchor.attr("title")?.trim() || "첨부파일";
+    const looksLikeFile =
+      anchor.is("[download]") ||
+      /\.(pdf|hwp|hwpx|doc|docx|xls|xlsx|ppt|pptx|zip)(?:$|[?#])/i.test(href) ||
+      /(file|atch|attach|download)/i.test(href + " " + label);
+    if (!looksLikeFile) return;
+
+    let resolved: URL;
+    try {
+      resolved = new URL(href, baseUrl);
+    } catch {
+      return;
+    }
+    if (
+      !["http:", "https:"].includes(resolved.protocol) ||
+      resolved.username ||
+      resolved.password ||
+      isPrivateHostname(resolved.hostname)
+    ) {
+      return;
+    }
+    const url = resolved.toString();
+    if (seen.has(url)) return;
+    seen.add(url);
+    links.push({ label: label.slice(0, 300), url });
+  });
+
+  return links;
+}
+
+function isPrivateHostname(hostname: string) {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (host === "localhost" || host.endsWith(".local")) return true;
+  if (/^(127\.|10\.|192\.168\.|169\.254\.)/.test(host)) return true;
+  const match = host.match(/^172\.(\d+)\./);
+  return Boolean(match && Number(match[1]) >= 16 && Number(match[1]) <= 31);
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+    .join(",")}}`;
+}

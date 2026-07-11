@@ -21,6 +21,7 @@ export default async function DetailPage({ params }: { params: { id: string } })
       item.extra_sections?.length ||
       item.attachments?.length
   );
+  const hasStoredOriginal = Boolean(item.detail_fetched_at && item.detail_content);
 
   return (
     <article className="mx-auto max-w-3xl">
@@ -58,19 +59,25 @@ export default async function DetailPage({ params }: { params: { id: string } })
 
         {hasDetailedInfo && (
           <div className="mt-6 space-y-7 border-t border-line pt-6">
-            <div className="rounded-lg border-l-4 border-info bg-[#EAF3FB] px-5 py-4 text-sm leading-relaxed text-ink">
-              K-Startup에 공고되는 정보는 해당 기관의 요청에 의해 제공됩니다. 사업 신청 시 요청하는 정보는 해당 기관에서 관리되오니 유의해 주세요.
-            </div>
+            {item.source_id === 2 && (
+              <div className="rounded-lg border-l-4 border-info bg-[#EAF3FB] px-5 py-4 text-sm leading-relaxed text-ink">
+                K-Startup에 공고되는 정보는 해당 기관의 요청에 의해 제공됩니다. 사업 신청 시 요청하는 정보는 해당 기관에서 관리되오니 유의해 주세요.
+              </div>
+            )}
             <DetailBlock
               title="상세내용"
               value={item.detail_content !== item.summary ? item.detail_content : null}
             />
-            <DetailBlock title="신청방법" value={item.apply_method} />
-            <DetailBlock title="제출서류" value={item.documents} />
-            {item.extra_sections?.map((section) => (
-              <DetailBlock key={section.title} title={section.title} value={section.body} />
-            ))}
-            <DetailBlock title="문의처" value={item.contact} />
+            {!hasStoredOriginal && (
+              <>
+                <DetailBlock title="신청방법" value={item.apply_method} />
+                <DetailBlock title="제출서류" value={item.documents} />
+                {item.extra_sections?.map((section) => (
+                  <DetailBlock key={section.title} title={section.title} value={section.body} />
+                ))}
+                <DetailBlock title="문의처" value={item.contact} />
+              </>
+            )}
             {(item.attachments?.length ?? 0) > 0 && (
               <AttachmentList links={item.attachments} />
             )}

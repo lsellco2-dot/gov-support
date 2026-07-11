@@ -4,6 +4,11 @@ import { mapCategories } from "./category";
 import { contentHash } from "./hash";
 import { SOURCE_ID, type NormalizedAnnouncement } from "./types";
 import { sanitizeDisplayText } from "@/lib/text/sanitize";
+import {
+  fetchAndStoreDetails,
+  loadExistingDetailStates,
+  needsDetailFetch,
+} from "./detail-store";
 
 const CHUNK = 500;
 const EXPIRED_RETENTION_DAYS = 2;
@@ -13,6 +18,11 @@ export interface IngestResult {
   upserted: number;
   skipped: number;
   failed: number;
+  detailsFetched: number;
+  detailsFailed: number;
+  detailsSkipped: number;
+  detailsPending: number;
+  detailSchemaReady?: boolean;
   error?: string;
 }
 
@@ -34,10 +44,25 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
   const deleteBefore = expiredDeleteBeforeDate();
 
   for (const adapter of targets) {
-    const r: IngestResult = { source: adapter.sourceCode, upserted: 0, skipped: 0, failed: 0 };
+    const r: IngestResult = {
+      source: adapter.sourceCode,
+      upserted: 0,
+      skipped: 0,
+      failed: 0,
+      detailsFetched: 0,
+      detailsFailed: 0,
+      detailsSkipped: 0,
+      detailsPending: 0,
+    };
+    let detailBudget = detailFetchLimitPerSource();
+    let detailSchemaReady: boolean | undefined;
+
     try {
       for await (const page of adapter.fetchPages({ serviceKey })) {
-        const rows = [];
+        const prepared: Array<{
+          normalized: NormalizedAnnouncement;
+          row: ReturnType<typeof toRow>;
+        }> = [];
         for (const raw of page) {
           const n = adapter.normalize(raw);
           if (!n) { r.skipped++; continue; }
@@ -45,8 +70,38 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
             r.skipped++;
             continue;
           }
-          rows.push(toRow(n));
+          prepared.push({ normalized: n, row: toRow(n) });
         }
+
+        let detailCandidates: NormalizedAnnouncement[] = [];
+        if (detailBudget > 0 && detailSchemaReady !== false && prepared.length > 0) {
+          const lookup = await loadExistingDetailStates(
+            SOURCE_ID[adapter.sourceCode],
+            prepared.map(({ normalized }) => normalized.sourceKey)
+          );
+          detailSchemaReady = lookup.schemaReady;
+          r.detailSchemaReady = lookup.schemaReady;
+
+          if (lookup.schemaReady && lookup.lookupReady) {
+            const eligible: NormalizedAnnouncement[] = [];
+            for (const { normalized } of prepared) {
+              if (!normalized.detailUrl) {
+                r.detailsSkipped++;
+              } else if (needsDetailFetch(normalized, lookup.states.get(normalized.sourceKey))) {
+                eligible.push(normalized);
+              } else {
+                r.detailsSkipped++;
+              }
+            }
+            detailCandidates = eligible.slice(0, detailBudget);
+            r.detailsPending += Math.max(0, eligible.length - detailCandidates.length);
+          } else if (lookup.schemaReady) {
+            r.detailsPending += prepared.filter(({ normalized }) => normalized.detailUrl).length;
+          }
+        }
+
+        const rows = prepared.map(({ row }) => row);
+        const successfulKeys = new Set<string>();
         for (let i = 0; i < rows.length; i += CHUNK) {
           const chunk = rows.slice(i, i + CHUNK);
           const { error } = await supabaseAdmin
@@ -57,7 +112,20 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
             console.error(`[${adapter.sourceCode}] upsert 실패:`, error.message);
           } else {
             r.upserted += chunk.length;
+            for (const row of chunk) successfulKeys.add(row.source_key);
           }
+        }
+
+        if (detailSchemaReady === false) {
+          r.detailsPending += prepared.filter(({ normalized }) => normalized.detailUrl).length;
+        } else if (detailCandidates.length > 0) {
+          const stored = await fetchAndStoreDetails(
+            detailCandidates.filter((candidate) => successfulKeys.has(candidate.sourceKey)),
+            SOURCE_ID[adapter.sourceCode]
+          );
+          r.detailsFetched += stored.fetched;
+          r.detailsFailed += stored.failed;
+          detailBudget -= detailCandidates.length;
         }
       }
     } catch (e: any) {
@@ -78,6 +146,12 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
   }
 
   return results;
+}
+
+function detailFetchLimitPerSource() {
+  const configured = Number(process.env.DETAIL_FETCH_LIMIT_PER_SOURCE ?? 8);
+  if (!Number.isFinite(configured)) return 8;
+  return Math.min(20, Math.max(0, Math.floor(configured)));
 }
 
 export async function purgeExpiredAnnouncements(): Promise<ExpiredCleanupResult> {

@@ -88,6 +88,13 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
   법적문서·README 전체를 변경. `grep "지원사업 한곳에"` 결과 0건 확인.
 - 내부 식별자(패키지명 `com.govsupport.app`, 폴더명 `gov-support`)는 의도적으로 미변경.
 
+### 7. 원문 상세 2단계 수집 (2026-07-12)
+- 목록 API 원본은 기존처럼 `raw_json`에 보존하고, 신규·payload 변경 공고만 원문 페이지를 추가 호출.
+- 원문 본문은 `detail_content`, 신청방법·제출서류·문의처는 구조화 컬럼, 첨부는 URL만 저장.
+- 소스별 공식 도메인만 호출하며 기본 8건/동시 3건/15초 timeout/2MB 응답 제한.
+- 운영 전 `supabase/migrations/20260712_add_announcement_details.sql` 실행 필요.
+- 마이그레이션 전에도 목록 수집은 정상 동작하고 상세 단계만 `detailSchemaReady:false`로 건너뜀.
+
 ## 크로스플랫폼 설계 원칙 (iOS 출시 계획 있음)
 
 안드로이드 반응을 본 뒤 **iOS(App Store)에도 출시할 계획**이다. 재작업을 피하기 위한 규칙:

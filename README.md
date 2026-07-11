@@ -50,6 +50,11 @@ curl "https://apis.data.go.kr/.../오퍼레이션?serviceKey=키&pageNo=1&numOfR
 - 소스 내 중복: `(source_id, source_key)` unique 제약 + upsert
 - 소스 간 중복: `content_hash`(정규화된 제목+기관+마감일 sha256)로 탐지,
   삭제하지 않고 `announcements_public` 뷰에서 대표 1건만 노출 (source_id 오름차순 우선)
+- 상세 원문: 목록 upsert 후 신규·API payload 변경 공고만 공식 원문 페이지를 추가 호출
+  - 소스별 기본 8건, 동시 3건, 요청 15초·응답 2MB·본문 20만 자 제한
+  - 본문 텍스트는 `detail_content`, 첨부파일은 본체가 아닌 `label/url`만 저장
+  - `DETAIL_FETCH_LIMIT_PER_SOURCE`로 0~20 범위 조정 가능
+  - 상세 컬럼이 아직 없으면 상세 단계만 건너뛰므로 기존 목록 수집은 중단되지 않음
 - 행안부(mois) 어댑터는 개인 혜택 제외: 기업 키워드 미포함 항목은 normalize에서 스킵
 - Vercel Cron: 매일 KST 06:00 (`vercel.json`). Hobby 플랜은 실행시간 제한이 있으므로
   느리면 `?source=bizinfo`처럼 소스별 분할 호출로 전환
@@ -60,6 +65,12 @@ curl "https://apis.data.go.kr/.../오퍼레이션?serviceKey=키&pageNo=1&numOfR
 - 클라이언트는 anon 키만 사용, RLS로 announcements/categories SELECT만 허용
 - `expert_leads`/`announcement_events`는 RLS 정책 없음 = API Route(service_role) 경유로만 쓰기
 - 전문가 상담은 `EXPERT_CONSULTATION_ENABLED=true`일 때만 UI와 API가 열리며 기본값은 비활성화
+
+## 상세 원문 저장 적용
+
+배포 전에 Supabase SQL Editor에서
+`supabase/migrations/20260712_add_announcement_details.sql`을 한 번 실행합니다.
+마이그레이션 후 다음 Cron부터 신규·변경 공고 상세가 점진적으로 백필됩니다.
 
 ## 남은 일 (MVP 범위 밖)
 
