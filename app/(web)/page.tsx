@@ -7,7 +7,7 @@ export default function HomePage() {
   return (
     <div className="mx-auto max-w-4xl">
       <section className="rounded-2xl border border-line bg-white px-6 py-14 text-center">
-        <p className="text-sm font-semibold text-primary">정부지원비서</p>
+        <p className="text-sm font-semibold text-primary">정부지원AI비서</p>
         <h1 className="mt-3 text-2xl font-bold leading-snug text-ink sm:text-3xl">
           나에게 맞는 정부지원사업을 한눈에
         </h1>

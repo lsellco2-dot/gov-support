@@ -1,4 +1,4 @@
-# 정부지원비서 — 정부지원사업 공고 통합 조회서비스 (MVP)
+# 정부지원AI비서 — 정부지원사업 공고 통합 조회서비스 (MVP)
 
 Next.js 14(App Router) + Supabase + Vercel. Android WebView는 `/app` 경로를 로드합니다.
 

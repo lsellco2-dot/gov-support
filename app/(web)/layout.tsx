@@ -7,7 +7,7 @@ export default function WebLayout({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary">
             <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-sm text-white">정</span>
-            정부지원비서
+            정부지원AI비서
           </Link>
           <span className="hidden text-xs text-subtle sm:inline">
             중기부 · 창진원 · 행안부 · 과기부 공고 통합조회

@@ -5,11 +5,11 @@
 > 이 폴더가 프로젝트 루트다(package.json·app·android·supabase 여기 있음). git 저장소 루트도 여기.
 > Honsulmap / contract-mvp / honsulmap-platform 은 **다른 프로젝트**이니 열지 말 것.
 
-정부지원사업 공고 통합 조회서비스 MVP "정부지원비서".
+정부지원사업 공고 통합 조회서비스 MVP "정부지원AI비서".
 Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebView 전용 UI.
 전체 구조와 수집 파이프라인 설명은 `README.md`, Android 앱은 `android/README.md` 참고.
 
-> 서비스 표시명은 **"정부지원비서"** (2026-07-07 "지원사업 한곳에"에서 변경, 커밋 907b4e5).
+> 서비스 표시명은 **"정부지원AI비서"** (2026-07-11 "정부지원비서"에서 변경).
 > 안드로이드 패키지명 `com.govsupport.app`·폴더명 `gov-support`는 내부 식별자라 그대로 유지
 > (표시명과 무관, 도메인 확정 시점에만 재검토 — android/README.md 릴리즈 체크리스트 참고).
 
@@ -84,7 +84,7 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
 - Next 14 fetch 캐시 버그 수정 (lib/supabase/*.ts의 cache:no-store — 제거 금지).
 
 ### 6. 서비스명 변경 (2026-07-07, 커밋 907b4e5)
-- "지원사업 한곳에" → **"정부지원비서"**. 9개 파일의 표시명·메타데이터·안드로이드 app_name·
+- "지원사업 한곳에" → "정부지원비서" → **"정부지원AI비서"**. 표시명·메타데이터·안드로이드 app_name·
   법적문서·README 전체를 변경. `grep "지원사업 한곳에"` 결과 0건 확인.
 - 내부 식별자(패키지명 `com.govsupport.app`, 폴더명 `gov-support`)는 의도적으로 미변경.
 
@@ -133,7 +133,7 @@ Next.js 14 App Router + Supabase + Tailwind. `/` = PC 웹, `/app` = Android WebV
 - 뱃지: `DDayBadge.tsx`·`CategoryChips.tsx` · 폼: `LeadForm.tsx`
 - 랜딩 히어로 패턴: `app/(web)/page.tsx`, `app/app/page.tsx` 참고.
 
-**주의**: "정부24/공식 정부 서비스"로 오해될 문구·로고·엠블럼 사용 금지. 서비스명은 "정부지원비서".
+**주의**: "정부24/공식 정부 서비스"로 오해될 문구·로고·엠블럼 사용 금지. 서비스명은 "정부지원AI비서".
 KRDS는 시각 스타일만 참고하고 코드를 직접 복붙하지 않음.
 
 ## 주의사항 / 컨벤션
