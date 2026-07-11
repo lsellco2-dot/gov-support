@@ -93,7 +93,7 @@ function PageLink({
   children: ReactNode;
 }) {
   const className = [
-    "inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-md border px-2.5 font-semibold tabular-nums transition",
+    "inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-md border px-2.5 font-semibold tabular-nums transition",
     active
       ? "border-primary bg-primary text-white shadow-sm"
       : "border-line bg-white text-ink hover:border-primary hover:text-primary",

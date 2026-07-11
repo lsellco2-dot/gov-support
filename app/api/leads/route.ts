@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { EXPERT_CONSULTATION_ENABLED } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  if (!EXPERT_CONSULTATION_ENABLED) {
+    return NextResponse.json({ error: "현재 제공하지 않는 기능입니다." }, { status: 404 });
+  }
+
   let body: any;
   try {
     body = await req.json();
@@ -29,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   // mock 모드: DB 없이 접수 성공 처리 (UI 흐름 확인용)
   if (process.env.NEXT_PUBLIC_USE_MOCK === "true") {
-    console.log("[mock] lead 접수:", { name: name.trim(), phone: phoneDigits, announcementId });
+    console.log("[mock] lead 접수 완료");
     return NextResponse.json({ ok: true });
   }
 

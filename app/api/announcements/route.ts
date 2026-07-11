@@ -17,7 +17,11 @@ export async function GET(req: NextRequest) {
       size: sp.get("size") ? Number(sp.get("size")) : undefined,
     });
     return NextResponse.json(result);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (error) {
+    console.error("announcement list 조회 실패:", error instanceof Error ? error.message : "unknown error");
+    return NextResponse.json(
+      { error: "공고 정보를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." },
+      { status: 500 }
+    );
   }
 }

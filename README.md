@@ -56,9 +56,10 @@ curl "https://apis.data.go.kr/.../오퍼레이션?serviceKey=키&pageNo=1&numOfR
 
 ## 보안
 
-- `DATA_GO_KR_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`은 서버 전용 (NEXT_PUBLIC_ 금지)
+- `DATA_GO_KR_KEY`, `BIZINFO_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`은 서버 전용 (NEXT_PUBLIC_ 금지)
 - 클라이언트는 anon 키만 사용, RLS로 announcements/categories SELECT만 허용
 - `expert_leads`/`announcement_events`는 RLS 정책 없음 = API Route(service_role) 경유로만 쓰기
+- 전문가 상담은 `EXPERT_CONSULTATION_ENABLED=true`일 때만 UI와 API가 열리며 기본값은 비활성화
 
 ## 남은 일 (MVP 범위 밖)
 

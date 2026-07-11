@@ -9,7 +9,7 @@ export default function FilterBar({
   defaults: { q?: string; audience?: string; category?: string; region?: string; status?: string; sort?: string };
 }) {
   const selectClass =
-    "h-11 rounded-lg border border-line bg-white px-3 text-sm text-ink focus:border-primary";
+    "h-11 max-w-full rounded-lg border border-line bg-white px-3 text-sm text-ink focus:border-primary";
   return (
     <form
       action={action}

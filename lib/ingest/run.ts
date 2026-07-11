@@ -62,14 +62,17 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
       }
     } catch (e: any) {
       // 어댑터 하나가 실패해도 나머지는 계속
-      r.error = e?.message ?? String(e);
-      console.error(`[${adapter.sourceCode}] 수집 중단:`, r.error);
+      const internalError = e?.message ?? String(e);
+      r.error = "수집 실패";
+      console.error(`[${adapter.sourceCode}] 수집 중단:`, internalError);
     }
 
-    await supabaseAdmin
-      .from("sources")
-      .update({ last_fetched_at: new Date().toISOString() })
-      .eq("code", adapter.sourceCode);
+    if (!r.error && r.failed === 0) {
+      await supabaseAdmin
+        .from("sources")
+        .update({ last_fetched_at: new Date().toISOString() })
+        .eq("code", adapter.sourceCode);
+    }
 
     results.push(r);
   }
@@ -86,7 +89,7 @@ export async function purgeExpiredAnnouncements(): Promise<ExpiredCleanupResult>
 
   if (error) {
     console.error("[cleanup] expired announcement deletion failed:", error.message);
-    return { deleted: 0, deleteBefore, error: error.message };
+    return { deleted: 0, deleteBefore, error: "마감 공고 정리 실패" };
   }
 
   return { deleted: count ?? 0, deleteBefore };

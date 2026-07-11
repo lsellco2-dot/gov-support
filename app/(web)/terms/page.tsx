@@ -20,7 +20,7 @@ export default function TermsPage() {
       <Section title="제1조 (목적)">
         <p>
           이 약관은 &lsquo;정부지원비서&rsquo;(이하 &ldquo;서비스&rdquo;)가 제공하는
-          정부지원사업 공고 통합 조회 및 전문가 상담 연결 서비스의 이용 조건과 절차, 서비스와
+          정부지원사업 공고 통합 조회 서비스의 이용 조건과 절차, 서비스와
           이용자의 권리·의무를 규정함을 목적으로 합니다.
         </p>
       </Section>
@@ -29,7 +29,7 @@ export default function TermsPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>공공데이터포털 등 공개 API를 통해 수집한 정부지원사업 공고의 통합 조회</li>
           <li>공고 검색, 분야·지역·상태별 필터링</li>
-          <li>희망 시 정부지원사업 상담 전문가 연결</li>
+          <li>전문가 상담 연결 기능은 준비 중이며 현재 제공하지 않습니다.</li>
         </ul>
       </Section>
 
@@ -51,25 +51,14 @@ export default function TermsPage() {
       </Section>
 
       <Section title="제4조 (전문가 상담 연결)">
-        <ul className="list-disc space-y-1 pl-5">
-          <li>전문가 상담 연결은 이용자의 요청이 있는 경우에만 진행됩니다.</li>
-          <li>
-            1차 상담은 무료이며, 이후 전문가와 이용자 간 별도 계약에 따른 유료 용역은 서비스와
-            무관하게 당사자 간 체결됩니다.
-          </li>
-          <li>
-            상담 연결 시 개인정보 처리에 관한 사항은{" "}
-            <a href="/privacy" className="text-primary underline">
-              개인정보처리방침
-            </a>
-            을 따릅니다.
-          </li>
-        </ul>
+        <p>
+          전문가 상담 연결 기능은 현재 제공하지 않습니다. 향후 기능을 활성화할 경우 이용 조건과
+          개인정보 처리 내용을 별도로 고지하고 필요한 동의를 받습니다.
+        </p>
       </Section>
 
       <Section title="제5조 (이용자의 의무)">
         <ul className="list-disc space-y-1 pl-5">
-          <li>타인의 정보를 도용하여 상담을 요청해서는 안 됩니다.</li>
           <li>서비스의 정상적인 운영을 방해하는 행위(자동화된 대량 조회 등)를 해서는 안 됩니다.</li>
         </ul>
       </Section>

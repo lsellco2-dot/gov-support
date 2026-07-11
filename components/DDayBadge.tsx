@@ -3,7 +3,7 @@ export default function DDayBadge({ applyEnd }: { applyEnd: string | null }) {
   if (!applyEnd) {
     return (
       <span className="shrink-0 rounded-badge px-2 py-0.5 text-xs font-semibold bg-slate-100 text-subtle">
-        상시
+        상시/미정
       </span>
     );
   }

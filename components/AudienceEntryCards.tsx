@@ -86,7 +86,7 @@ export default function AudienceEntryCards({
             aria-selected={selected}
             className={[
               "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition",
-              compact ? "h-9" : "h-10",
+              "h-11",
               selected
                 ? "border-primary bg-primary text-white"
                 : "border-line bg-white text-subtle hover:border-primary hover:text-primary",

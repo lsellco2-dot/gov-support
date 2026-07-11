@@ -7,13 +7,37 @@ export function sanitizeDisplayText(value: string | null | undefined): string | 
 export function sanitizeDisplayText(value: string | null | undefined) {
   if (value === null || value === undefined) return null;
 
-  const withoutEmoji = value
+  const withoutHtml = decodeHtmlEntities(value)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");
+
+  const withoutEmoji = withoutHtml
     .replace(EMOJI_RE, "")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n[ \t]+/g, "\n")
     .trim();
 
   return stripEdgeBrokenQuestionMarks(withoutEmoji);
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (entity, hex) => decodeCodePoint(entity, hex, 16))
+    .replace(/&#(\d+);/g, (entity, decimal) => decodeCodePoint(entity, decimal, 10));
+}
+
+function decodeCodePoint(entity: string, value: string, radix: number) {
+  const codePoint = Number.parseInt(value, radix);
+  return Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff
+    ? String.fromCodePoint(codePoint)
+    : entity;
 }
 
 function stripEdgeBrokenQuestionMarks(value: string) {

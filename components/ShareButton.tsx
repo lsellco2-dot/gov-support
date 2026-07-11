@@ -48,7 +48,7 @@ export default function ShareButton({ title }: { title: string }) {
     <button
       type="button"
       onClick={onShare}
-      className="flex h-8 shrink-0 items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-600 active:bg-slate-50"
+      className="flex h-11 shrink-0 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 active:bg-slate-50"
       aria-label="공고 공유하기"
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

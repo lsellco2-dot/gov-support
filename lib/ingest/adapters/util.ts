@@ -3,6 +3,8 @@
 // pick()으로 후보 필드명을 순서대로 시도하고, 실제 샘플 응답 확인 후
 // 각 어댑터 상단의 필드 후보 목록을 확정할 것.
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 export function pick(obj: any, keys: string[]): string | null {
   for (const k of keys) {
     const v = obj?.[k];
@@ -60,6 +62,7 @@ export async function fetchJson(url: string): Promise<any> {
       const res = await fetch(url, {
         headers: { Accept: "application/json" },
         cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
@@ -78,7 +81,10 @@ export async function fetchJson(url: string): Promise<any> {
 
 /** XML 전용 API(과기부 등)용: <item>...</item> 블록을 평면 객체 배열로 파싱 */
 export async function fetchXmlItems(url: string): Promise<Record<string, string>[]> {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
   const items: Record<string, string>[] = [];

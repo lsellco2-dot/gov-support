@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import AnnouncementCard from "@/components/AnnouncementCard";
 import AudienceEntryCards from "@/components/AudienceEntryCards";
 import FilterBar from "@/components/FilterBar";
 import Pagination from "@/components/Pagination";
 import { listAnnouncements, type AudienceGroup } from "@/lib/query/announcements";
+import { canonicalPageUrl } from "@/lib/query/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,8 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
     sort: (searchParams.sort as any) ?? "deadline",
     page: searchParams.page ? Number(searchParams.page) : 1,
   });
+  const canonicalUrl = canonicalPageUrl("/announcements", searchParams, page, total, size);
+  if (canonicalUrl) redirect(canonicalUrl);
 
   return (
     <div>

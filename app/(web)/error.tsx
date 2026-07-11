@@ -2,10 +2,8 @@
 
 // (web) 세그먼트 공통 에러 화면 — DB 연결 실패 등
 export default function ErrorPage({
-  error,
   reset,
 }: {
-  error: Error & { digest?: string };
   reset: () => void;
 }) {
   return (
@@ -15,11 +13,6 @@ export default function ErrorPage({
       <p className="mt-2 text-sm text-slate-500">
         일시적인 오류일 수 있습니다. 잠시 후 다시 시도해 주세요.
       </p>
-      {process.env.NODE_ENV === "development" && (
-        <p className="mt-3 break-all rounded bg-slate-50 p-3 text-left text-xs text-slate-400">
-          {error.message}
-        </p>
-      )}
       <button
         onClick={reset}
         className="mt-5 h-10 rounded-md bg-primary px-6 text-sm font-semibold text-white hover:bg-primary-dark"

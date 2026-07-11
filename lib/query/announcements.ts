@@ -55,6 +55,13 @@ export interface AnnouncementDetail extends AnnouncementRow {
   extra_sections: DetailSection[];
 }
 
+export interface AnnouncementListResult {
+  items: AnnouncementRow[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 export const CATEGORIES = [
   { id: 1, name: "창업지원" },
   { id: 2, name: "소상공인 지원" },
@@ -151,12 +158,16 @@ function listFromFixtures(p: ListParams, page: number, size: number) {
 }
 
 /** 목록 조회 — 중복 제거된 뷰(announcements_public) 기준 */
-export async function listAnnouncements(p: ListParams) {
+export async function listAnnouncements(p: ListParams): Promise<AnnouncementListResult> {
   const page = positiveInt(p.page, 1);
   const size = Math.min(MAX_SIZE, positiveInt(p.size, DEFAULT_SIZE));
   const from = (page - 1) * size;
 
-  if (USE_MOCK) return listFromFixtures(p, page, size);
+  if (USE_MOCK) {
+    const result = listFromFixtures(p, page, size);
+    const lastPage = Math.max(1, Math.ceil(result.total / size));
+    return page > lastPage ? listFromFixtures(p, lastPage, size) : result;
+  }
 
   let q = supabaseAnon
     .from("announcements_public")
@@ -180,14 +191,24 @@ export async function listAnnouncements(p: ListParams) {
   }
 
   const { data, count, error } = await q.range(from, from + size - 1);
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (page > 1 && error.code === "PGRST103") {
+      return listAnnouncements({ ...p, page: 1, size });
+    }
+    throw new Error(error.message);
+  }
 
-  return {
+  const result = {
     items: ((data ?? []) as AnnouncementRow[]).map(sanitizeDisplayRow),
     total: count ?? 0,
     page,
     size,
   };
+  const lastPage = Math.max(1, Math.ceil(result.total / size));
+  if (page > lastPage) {
+    return listAnnouncements({ ...p, page: lastPage, size });
+  }
+  return result;
 }
 
 function matchesAudience(text: string, audience: AudienceGroup) {
@@ -285,7 +306,7 @@ function toDetail(row: AnnouncementRecord): AnnouncementDetail {
     summary: sanitizeDisplayText(row.summary),
     apply_start: row.apply_start,
     apply_end: row.apply_end,
-    detail_url: row.detail_url,
+    detail_url: safeHttpUrl(row.detail_url),
     status: row.apply_end === null || row.apply_end >= todayKst() ? "open" : "closed",
     created_at: row.created_at,
     detail_content: sanitizeDisplayText(detailContent),
@@ -330,6 +351,7 @@ async function fetchKstartupSections(url: string) {
         "User-Agent": "gov-support-detail-fetcher/1.0",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return null;
     const html = await res.text();
@@ -515,6 +537,17 @@ function isUrl(value: string) {
 
 function normalizeUrl(value: string) {
   return /^www\./i.test(value) ? `https://${value}` : value;
+}
+
+function safeHttpUrl(value: string | null) {
+  if (!value) return null;
+  const normalized = normalizeUrl(value.trim());
+  try {
+    const url = new URL(normalized);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function todayKst() {
