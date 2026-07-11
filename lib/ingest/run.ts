@@ -6,12 +6,19 @@ import { SOURCE_ID, type NormalizedAnnouncement } from "./types";
 import { sanitizeDisplayText } from "@/lib/text/sanitize";
 
 const CHUNK = 500;
+const EXPIRED_RETENTION_DAYS = 2;
 
 export interface IngestResult {
   source: string;
   upserted: number;
   skipped: number;
   failed: number;
+  error?: string;
+}
+
+export interface ExpiredCleanupResult {
+  deleted: number;
+  deleteBefore: string;
   error?: string;
 }
 
@@ -24,6 +31,7 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
   );
 
   const results: IngestResult[] = [];
+  const deleteBefore = expiredDeleteBeforeDate();
 
   for (const adapter of targets) {
     const r: IngestResult = { source: adapter.sourceCode, upserted: 0, skipped: 0, failed: 0 };
@@ -33,6 +41,10 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
         for (const raw of page) {
           const n = adapter.normalize(raw);
           if (!n) { r.skipped++; continue; }
+          if (n.applyEnd && n.applyEnd < deleteBefore) {
+            r.skipped++;
+            continue;
+          }
           rows.push(toRow(n));
         }
         for (let i = 0; i < rows.length; i += CHUNK) {
@@ -63,6 +75,33 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
   }
 
   return results;
+}
+
+export async function purgeExpiredAnnouncements(): Promise<ExpiredCleanupResult> {
+  const deleteBefore = expiredDeleteBeforeDate();
+  const { count, error } = await supabaseAdmin
+    .from("announcements")
+    .delete({ count: "exact" })
+    .lt("apply_end", deleteBefore);
+
+  if (error) {
+    console.error("[cleanup] expired announcement deletion failed:", error.message);
+    return { deleted: 0, deleteBefore, error: error.message };
+  }
+
+  return { deleted: count ?? 0, deleteBefore };
+}
+
+function expiredDeleteBeforeDate(now = new Date()): string {
+  const seoulDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  const cutoff = new Date(`${seoulDate}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - EXPIRED_RETENTION_DAYS);
+  return cutoff.toISOString().slice(0, 10);
 }
 
 function toRow(n: NormalizedAnnouncement) {
