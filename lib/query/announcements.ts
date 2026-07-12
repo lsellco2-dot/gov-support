@@ -316,10 +316,12 @@ function toDetail(row: AnnouncementRecord): AnnouncementDetail {
     detail_url: safeHttpUrl(row.detail_url),
     status: row.apply_end === null || row.apply_end >= todayKst() ? "open" : "closed",
     created_at: row.created_at,
-    detail_content: sanitizeDisplayText(cleanText(row.detail_content ?? null) ?? detailContent),
-    apply_method: sanitizeDisplayText(cleanText(row.apply_method ?? null) ?? buildApplyMethod(raw)),
-    documents: sanitizeDisplayText(cleanText(row.documents ?? null) ?? documents),
-    contact: sanitizeDisplayText(cleanText(row.contact ?? null) ?? buildContact(raw)),
+    // 저장된 원문 컬럼은 이미 정제된 텍스트라 cleanText(문단 빈 줄 붕괴)를 거치지 않는다.
+    // 문단 구분(\n\n)이 상세 화면의 섹션 제목 위계 감지에 그대로 쓰인다.
+    detail_content: sanitizeDisplayText(hasText(row.detail_content) ? row.detail_content! : detailContent),
+    apply_method: sanitizeDisplayText(hasText(row.apply_method) ? row.apply_method! : buildApplyMethod(raw)),
+    documents: sanitizeDisplayText(hasText(row.documents) ? row.documents! : documents),
+    contact: sanitizeDisplayText(hasText(row.contact) ? row.contact! : buildContact(raw)),
     attachments: mergeLinks(storedLinks(row.attachments), buildLinks(raw)),
     extra_sections: [],
     detail_fetched_at: row.detail_fetched_at ?? null,
@@ -482,6 +484,10 @@ function pickRaw(raw: Record<string, unknown>, keys: string[]) {
     }
   }
   return null;
+}
+
+function hasText(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function cleanText(value: string | null) {

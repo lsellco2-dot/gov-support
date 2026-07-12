@@ -4,6 +4,7 @@ import DDayBadge from "@/components/DDayBadge";
 import CategoryChips from "@/components/CategoryChips";
 import LeadForm from "@/components/LeadForm";
 import ShareButton from "@/components/ShareButton";
+import DetailContentBody from "@/components/DetailContentBody";
 import { getAnnouncement } from "@/lib/query/announcements";
 import { EXPERT_CONSULTATION_ENABLED } from "@/lib/features";
 
@@ -109,23 +110,14 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
 
 function DetailBlock({ title, value }: { title: string; value: string | null }) {
   if (!value) return null;
-  const rows = toDetailRows(value);
   return (
     <section className="border-t border-slate-200 pt-4 first:border-t-0 first:pt-0">
-      <h2 className="text-sm font-bold text-ink">{title}</h2>
-      <div className="mt-2 divide-y divide-slate-100 border-y border-slate-100">
-        {rows.map((row, index) => (
-          <div key={`${row.label}-${index}`} className="py-3 text-sm leading-relaxed">
-            {row.body ? (
-              <>
-                <h3 className="font-bold text-ink">{row.label}</h3>
-                <p className="mt-1 whitespace-pre-line text-slate-700">{row.body}</p>
-              </>
-            ) : (
-              <p className="whitespace-pre-line font-semibold text-slate-700">{row.label}</p>
-            )}
-          </div>
-        ))}
+      <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+        <span aria-hidden className="h-4 w-1 shrink-0 rounded-full bg-primary" />
+        {title}
+      </h2>
+      <div className="mt-3 rounded-lg border border-line bg-white px-4 py-4">
+        <DetailContentBody text={value} />
       </div>
     </section>
   );
@@ -155,17 +147,4 @@ function AttachmentList({ links }: { links: { label: string; url: string }[] }) 
 function formatApplyPeriod(start: string | null, end: string | null) {
   if (!start && !end) return "정보 없음";
   return `${start ?? "시작일 미정"} ~ ${end ?? "상시/미정"}`;
-}
-
-function toDetailRows(value: string) {
-  const blocks = value
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-
-  return blocks.map((block) => {
-    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
-    if (lines.length <= 1) return { label: lines[0] ?? block, body: "" };
-    return { label: lines[0], body: lines.slice(1).join("\n") };
-  });
 }
