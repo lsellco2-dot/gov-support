@@ -137,6 +137,29 @@ create table if not exists announcement_events (
   created_at timestamptz default now()
 );
 
+-- 앱 설치 단위 공고 알림 설정 (로그인 없는 앱 전용 기능)
+create table if not exists device_installations (
+  installation_id uuid primary key,
+  token_hash text not null check (token_hash ~ '^[0-9a-f]{64}$'),
+  platform text not null check (platform in ('android', 'ios')),
+  app_version text,
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+
+create table if not exists announcement_alerts (
+  installation_id uuid not null
+    references device_installations(installation_id) on delete cascade,
+  announcement_id bigint not null
+    references announcements(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (installation_id, announcement_id)
+);
+
+create index if not exists idx_announcement_alerts_announcement
+  on announcement_alerts (announcement_id);
+
 -- ── RLS ────────────────────────────────────────────────────
 alter table announcements enable row level security;
 create policy "public read announcements" on announcements for select using (true);
@@ -150,3 +173,6 @@ create policy "public read sources" on sources for select using (true);
 -- leads / events: 정책 없음 = anon 접근 불가. service_role(API Route)만 쓰기.
 alter table expert_leads enable row level security;
 alter table announcement_events enable row level security;
+
+alter table device_installations enable row level security;
+alter table announcement_alerts enable row level security;

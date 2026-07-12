@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test": "tsx --test lib/mobile/notification-feed.test.ts lib/mobile/installation-auth.test.ts lib/mobile/app-bridge.test.ts",
     "start": "next start",
     "ingest": "curl -X POST -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/ingest",
     "backfill:details": "tsx scripts/backfill-announcement-details.ts"
@@ -12,6 +13,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "cheerio": "1.0.0",
+    "lucide-react": "^0.468.0",
     "next": "14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

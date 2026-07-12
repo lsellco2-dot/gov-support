@@ -5,6 +5,7 @@ import CategoryChips from "@/components/CategoryChips";
 import LeadForm from "@/components/LeadForm";
 import ShareButton from "@/components/ShareButton";
 import DetailContentBody from "@/components/DetailContentBody";
+import AnnouncementAlertButton from "@/components/AnnouncementAlertButton";
 import { getAnnouncement } from "@/lib/query/announcements";
 import { EXPERT_CONSULTATION_ENABLED } from "@/lib/features";
 
@@ -53,6 +54,7 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
             상세 내용은 원문 공고에서 확인해 주세요.
           </p>
         )}
+        <AnnouncementAlertButton announcementId={item.id} />
         {hasDetailedInfo && (
           <div className="mt-5 space-y-5 border-t border-line pt-5">
             {item.source_id === 2 && (

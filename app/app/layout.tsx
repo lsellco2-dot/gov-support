@@ -1,9 +1,10 @@
 import Link from "next/link";
+import AppBottomNav from "@/components/AppBottomNav";
 
 // Android WebView가 로드하는 모바일 전용 레이아웃
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto min-h-screen max-w-md bg-[var(--bg)] pb-16">
+    <div className="mx-auto min-h-screen max-w-md bg-[var(--bg)] pb-[calc(4.25rem+env(safe-area-inset-bottom))]">
       <header className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur">
         <div className="flex h-12 items-center justify-center">
           <Link href="/app" className="text-base font-bold text-primary">
@@ -23,17 +24,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </footer>
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-10 mx-auto flex h-14 max-w-md items-stretch border-t border-line bg-white">
-        <Link href="/app" className="flex flex-1 items-center justify-center text-sm font-semibold text-primary">
-          홈
-        </Link>
-        <Link href="/app/announcements?audience=all" className="flex flex-1 items-center justify-center text-sm text-slate-500">
-          전체공고
-        </Link>
-        <Link href="/app/announcements?audience=all&status=open&sort=deadline" className="flex flex-1 items-center justify-center text-sm text-slate-500">
-          마감임박
-        </Link>
-      </nav>
+      <AppBottomNav />
     </div>
   );
 }
