@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, House, List } from "lucide-react";
+import { House, Sparkles, Star } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/app/announcements", label: "전체공고", icon: List },
+  { href: "/app/recommendations", label: "AI추천", icon: Sparkles },
   { href: "/app", label: "홈", icon: House },
-  { href: "/app/alerts", label: "내 알림", icon: Bell },
+  { href: "/app/favorites", label: "즐겨찾기", icon: Star },
 ] as const;
 
 export default function AppBottomNav() {

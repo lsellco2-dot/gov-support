@@ -48,7 +48,9 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
             조건에 맞는 공고가 없습니다.
           </div>
         ) : (
-          items.map((item) => <AnnouncementCard key={item.id} item={item} basePath="/app" />)
+          items.map((item) => (
+            <AnnouncementCard key={item.id} item={item} basePath="/app" showFavorite />
+          ))
         )}
       </div>
       <Pagination page={page} size={size} total={total} basePath="/app/announcements" params={searchParams} />

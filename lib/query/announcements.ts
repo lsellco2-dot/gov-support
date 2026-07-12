@@ -81,7 +81,7 @@ export const REGIONS = [
 ] as const;
 
 const DEFAULT_SIZE = 10;
-const MAX_SIZE = 50;
+const MAX_SIZE = 100;
 
 const AUDIENCE_KEYWORDS: Record<Exclude<AudienceGroup, "all">, string[]> = {
   business: [
