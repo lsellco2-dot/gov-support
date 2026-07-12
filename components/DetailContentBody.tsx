@@ -1,21 +1,33 @@
 import { Fragment } from "react";
+import {
+  createEmphasisState,
+  stripEmphasisMarkers,
+  stripLeadingMarker,
+  tokenizeEmphasisLine,
+  type EmphasisSegment,
+} from "@/lib/text/emphasis";
 
 /*
   저장된 원문 텍스트(detail_content 등)를 KRDS 톤의 위계로 렌더링한다.
   - 원문을 요약·재배열하지 않고 줄 순서 그대로, 스타일만 입힌다.
-  - 감지 규칙(화이트리스트 아님 — 어떤 줄도 누락되지 않는다):
+  - 구조 감지(화이트리스트 아님 — 어떤 줄도 누락되지 않는다):
     · 빈 줄 뒤의 짧은 명사형 줄 → 섹션 제목
     · 섹션 제목 바로 아래의 짧은 줄 → 소제목(또는 라벨의 값)
     · □ ■ ○ ▶ 시작 → 항목 제목 / - · • ㆍ 시작 → 목록 / ※ ☞ 시작 → 비고
     · 그 외 → 본문 문단 (URL은 링크로)
+  - 강조 표시:
+    · 수집기가 심은 [[em]](원문 빨간 글씨)·[[b]](굵은 글씨) 마커 → span 스타일
+    · 마커가 없는 비고 줄도 주의 키워드가 있으면 경고 톤으로 보완 표시
 */
 
 type LineNode = {
   kind: "heading" | "subheading" | "item" | "bullet" | "note" | "paragraph";
-  text: string;
+  segments: EmphasisSegment[];
+  warning?: boolean;
 };
 
 const TITLE_MAX_LENGTH = 22;
+const WARNING_RE = /(주의|유의|반드시|필수|불이익|제외|금지|불가)/;
 
 function isTitleCandidate(line: string) {
   if (line.length < 2 || line.length > TITLE_MAX_LENGTH) return false;
@@ -30,45 +42,53 @@ function isTitleCandidate(line: string) {
 function parseLines(text: string): LineNode[] {
   const lines = text.replace(/[​﻿]/g, "").split("\n");
   const nodes: LineNode[] = [];
+  const emphasis = createEmphasisState();
   let previousWasEmpty = true;
   let previousKind: LineNode["kind"] | null = null;
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
+    const stripped = stripEmphasisMarkers(line).trim();
 
-    if (!line) {
+    if (!stripped) {
+      // 마커만 있는 줄도 강조 상태는 이어받는다.
+      if (line) tokenizeEmphasisLine(line, emphasis);
       previousWasEmpty = true;
       continue;
     }
 
+    let segments = tokenizeEmphasisLine(line, emphasis);
     let node: LineNode;
 
-    if (/^[※☞]/.test(line)) {
-      node = { kind: "note", text: line.replace(/^[※☞]\s*/, "") };
-    } else if (/^[□■◎○▶]/.test(line)) {
-      node = { kind: "item", text: line.replace(/^[□■◎○▶]\s*/, "") };
-    } else if (/^[-·•◦ㆍ]/.test(line)) {
-      node = { kind: "bullet", text: line.replace(/^[-·•◦ㆍ]\s*/, "") };
-    } else if (isTitleCandidate(line)) {
+    if (/^[※☞]/.test(stripped)) {
+      segments = stripLeadingMarker(segments, /^\s*[※☞]\s*/);
+      node = { kind: "note", segments, warning: WARNING_RE.test(stripped) };
+    } else if (/^[□■◎○▶]/.test(stripped)) {
+      segments = stripLeadingMarker(segments, /^\s*[□■◎○▶]\s*/);
+      node = { kind: "item", segments };
+    } else if (/^[-·•◦ㆍ]/.test(stripped)) {
+      segments = stripLeadingMarker(segments, /^\s*[-·•◦ㆍ]\s*/);
+      node = { kind: "bullet", segments };
+    } else if (isTitleCandidate(stripped)) {
       const followsTitleDirectly =
         !previousWasEmpty && (previousKind === "heading" || previousKind === "subheading");
 
       if (previousKind === "item") {
         // □ 항목 바로 아래 나열되는 줄들은 목록 내용으로 본다.
-        node = { kind: "paragraph", text: line };
+        node = { kind: "paragraph", segments };
       } else if (followsTitleDirectly) {
         // 제목 바로 아랫줄의 짧은 줄: 소제목이거나 라벨의 값(기관명 등)
-        node = { kind: "subheading", text: line };
+        node = { kind: "subheading", segments };
       } else if (previousWasEmpty && previousKind === "heading") {
         // 제목 → (빈 줄) → 짧은 줄: 라벨-값 구조의 값
-        node = { kind: "subheading", text: line };
+        node = { kind: "subheading", segments };
       } else if (previousWasEmpty || previousKind === null) {
-        node = { kind: "heading", text: line };
+        node = { kind: "heading", segments };
       } else {
-        node = { kind: "paragraph", text: line };
+        node = { kind: "paragraph", segments };
       }
     } else {
-      node = { kind: "paragraph", text: line };
+      node = { kind: "paragraph", segments };
     }
 
     nodes.push(node);
@@ -102,6 +122,34 @@ function LinkifiedText({ text }: { text: string }) {
   );
 }
 
+function SegmentText({ segments }: { segments: EmphasisSegment[] }) {
+  return (
+    <>
+      {segments.map((segment, index) => {
+        if (segment.red) {
+          return (
+            <span key={index} className={`text-urgent ${segment.bold ? "font-bold" : "font-medium"}`}>
+              <LinkifiedText text={segment.text} />
+            </span>
+          );
+        }
+        if (segment.bold) {
+          return (
+            <span key={index} className="font-semibold text-ink">
+              <LinkifiedText text={segment.text} />
+            </span>
+          );
+        }
+        return (
+          <Fragment key={index}>
+            <LinkifiedText text={segment.text} />
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
 export default function DetailContentBody({ text }: { text: string }) {
   const nodes = parseLines(text);
   if (nodes.length === 0) return null;
@@ -116,14 +164,16 @@ export default function DetailContentBody({ text }: { text: string }) {
               className="mt-6 flex items-center gap-2 border-t border-line pt-5 first:mt-0 first:border-t-0 first:pt-0"
             >
               <span aria-hidden className="h-4 w-[3px] shrink-0 rounded-full bg-primary" />
-              <h3 className="text-[15px] font-bold text-ink">{node.text}</h3>
+              <h3 className="text-[15px] font-bold text-ink">
+                <SegmentText segments={node.segments} />
+              </h3>
             </div>
           );
         }
         if (node.kind === "subheading") {
           return (
             <p key={index} className="mt-3 font-semibold text-ink">
-              {node.text}
+              <SegmentText segments={node.segments} />
             </p>
           );
         }
@@ -132,7 +182,7 @@ export default function DetailContentBody({ text }: { text: string }) {
             <p key={index} className="mt-4 flex items-start gap-2 font-semibold text-ink">
               <span aria-hidden className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-[2px] bg-primary/70" />
               <span>
-                <LinkifiedText text={node.text} />
+                <SegmentText segments={node.segments} />
               </span>
             </p>
           );
@@ -142,21 +192,30 @@ export default function DetailContentBody({ text }: { text: string }) {
             <p key={index} className="mt-1 flex items-start gap-2 pl-1">
               <span aria-hidden className="mt-[9px] h-[3px] w-[7px] shrink-0 rounded-full bg-line" />
               <span className="min-w-0">
-                <LinkifiedText text={node.text} />
+                <SegmentText segments={node.segments} />
               </span>
             </p>
           );
         }
         if (node.kind === "note") {
+          const hasRedSegment = node.segments.some((segment) => segment.red);
+          const isWarning = node.warning || hasRedSegment;
           return (
-            <p key={index} className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-[13px] text-subtle">
-              ※ <LinkifiedText text={node.text} />
+            <p
+              key={index}
+              className={
+                isWarning
+                  ? "mt-2 rounded-md border border-urgent/25 bg-red-50 px-3 py-2 text-[13px] text-urgent"
+                  : "mt-2 rounded-md bg-slate-50 px-3 py-2 text-[13px] text-subtle"
+              }
+            >
+              ※ <SegmentText segments={node.segments} />
             </p>
           );
         }
         return (
           <p key={index} className="mt-1 break-words">
-            <LinkifiedText text={node.text} />
+            <SegmentText segments={node.segments} />
           </p>
         );
       })}

@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { load, type Cheerio, type CheerioAPI } from "cheerio";
 import type { AnyNode } from "domhandler";
+import { B_CLOSE, B_OPEN, EM_CLOSE, EM_OPEN } from "@/lib/text/emphasis";
 import type { NormalizedAnnouncement, SourceCode } from "./types";
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -326,8 +327,64 @@ function emptySections() {
   };
 }
 
+// 원문에서 빨간 강조·굵은 글씨를 감지해 텍스트 마커로 보존한다.
+// (인라인 style color / font-weight, <font color>, <strong>/<b> 기준.
+//  CSS 클래스 기반 색상은 서버에서 해석할 수 없어 제외된다.)
+function annotateEmphasis($: CheerioAPI, root: Cheerio<AnyNode>) {
+  root.find("[style],font[color],strong,b").each((_, element) => {
+    const node = $(element);
+
+    // 중첩 강조는 바깥 것 하나만 표시한다.
+    if (node.parents("[data-gov-emphasis]").length > 0) return;
+    if (!node.text().trim()) return;
+
+    const kind = emphasisKind(node);
+    if (!kind) return;
+
+    node.attr("data-gov-emphasis", kind);
+    node.prepend(kind === "red" ? EM_OPEN : B_OPEN);
+    node.append(kind === "red" ? EM_CLOSE : B_CLOSE);
+  });
+}
+
+function emphasisKind(node: Cheerio<AnyNode>): "red" | "bold" | null {
+  const style = (node.attr("style") ?? "").toLowerCase();
+  const fontColor = node.is("font") ? (node.attr("color") ?? "") : "";
+  const styleColor = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/)?.[1] ?? "";
+  const color = (styleColor || fontColor).trim();
+
+  if (color && isRedColor(color)) return "red";
+  if (node.is("strong,b")) return "bold";
+  if (/font-weight\s*:\s*(bold|bolder|[7-9]00)/.test(style)) return "bold";
+  return null;
+}
+
+function isRedColor(value: string) {
+  const color = value.toLowerCase().trim();
+
+  if (/^(red|crimson|firebrick|darkred|orangered|tomato|indianred|maroon)$/.test(color)) {
+    return true;
+  }
+
+  let r = -1;
+  let g = -1;
+  let b = -1;
+  const hex6 = color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/);
+  const hex3 = color.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/);
+  const rgb = color.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+
+  if (hex6) [r, g, b] = [parseInt(hex6[1], 16), parseInt(hex6[2], 16), parseInt(hex6[3], 16)];
+  else if (hex3) [r, g, b] = [parseInt(hex3[1] + hex3[1], 16), parseInt(hex3[2] + hex3[2], 16), parseInt(hex3[3] + hex3[3], 16)];
+  else if (rgb) [r, g, b] = [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  else return false;
+
+  // 빨강 계열: R이 지배적이고 G/B가 낮은 색만 인정
+  return r >= 160 && g <= 96 && b <= 96;
+}
+
 function elementText($: CheerioAPI, root: Cheerio<AnyNode>) {
   const clone = root.clone();
+  annotateEmphasis($, clone);
   clone.find("br").replaceWith("\n");
   clone
     .find("h1,h2,h3,h4,h5,h6,p,li,dt,dd,tr,section,article")
