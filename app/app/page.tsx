@@ -7,12 +7,12 @@ export default function AppHome() {
   return (
     <div>
       <section className="rounded-xl border border-line bg-white px-4 py-8 text-center">
-        <p className="text-xs font-semibold text-primary">정부지원AI비서</p>
-        <h1 className="mt-2 text-lg font-bold leading-snug text-ink">
-          나에게 맞는 정부지원사업을 한눈에
+        <p className="text-base font-semibold text-primary">정부지원AI비서</p>
+        <h1 className="mt-2 text-2xl font-bold leading-snug text-ink sm:text-3xl">
+          AI 맞춤 설정하기
         </h1>
-        <p className="mt-2 text-xs leading-relaxed text-subtle">
-          창업, 사업, 취업 지원 공고를 쉽게 찾아보세요.
+        <p className="mt-2 text-sm leading-relaxed text-subtle sm:text-base">
+          나에게 맞는 맞춤 공고를 설정하세요.
         </p>
       </section>
 
