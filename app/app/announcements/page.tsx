@@ -19,7 +19,7 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
     category: searchParams.category ? Number(searchParams.category) : undefined,
     region: searchParams.region,
     status: (searchParams.status as any) ?? "open",
-    sort: (searchParams.sort as any) ?? "deadline",
+    sort: (searchParams.sort as any) ?? "latest",
     page: searchParams.page ? Number(searchParams.page) : 1,
   });
   const canonicalUrl = canonicalPageUrl("/app/announcements", searchParams, page, total, size);
@@ -40,7 +40,7 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
       </div>
 
       <p className="mt-3 text-xs text-subtle">
-        모집중 <b className="text-ink tabular-nums">{total.toLocaleString()}</b>건 · 마감 임박순
+        모집중 <b className="text-ink tabular-nums">{total.toLocaleString()}</b>건 · 최신 등록순
       </p>
       <div className="mt-2 space-y-2.5">
         {items.length === 0 ? (

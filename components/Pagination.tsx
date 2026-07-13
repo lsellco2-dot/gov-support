@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-const PAGE_GROUP_SIZE = 10;
+const PAGE_GROUP_SIZE = 4;
 
 export default function Pagination({
   page,

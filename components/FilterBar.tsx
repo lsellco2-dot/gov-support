@@ -65,9 +65,9 @@ export default function FilterBar({
           <option value="all">전체</option>
         </select>
         <label htmlFor="sort" className="sr-only">정렬</label>
-        <select id="sort" name="sort" defaultValue={defaults.sort ?? "deadline"} className={selectClass}>
-          <option value="deadline">마감 임박순</option>
+        <select id="sort" name="sort" defaultValue={defaults.sort ?? "latest"} className={selectClass}>
           <option value="latest">최신 등록순</option>
+          <option value="deadline">마감 임박순</option>
         </select>
       </div>
     </form>

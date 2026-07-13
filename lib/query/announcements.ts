@@ -117,6 +117,7 @@ const AUDIENCE_KEYWORDS: Record<Exclude<AudienceGroup, "all">, string[]> = {
 /** mock 모드: DB 쿼리와 동일한 조건으로 fixtures를 메모리 처리 */
 function listFromFixtures(p: ListParams, page: number, size: number) {
   let rows = FIXTURES.slice();
+  const sort = p.sort === "deadline" ? "deadline" : "latest";
 
   const status = p.status ?? "open";
   if (status !== "all") rows = rows.filter((r) => r.status === status);
@@ -137,8 +138,10 @@ function listFromFixtures(p: ListParams, page: number, size: number) {
     rows = rows.filter((r) => r.region === p.region || r.region === "전국");
   }
 
-  if (p.sort === "latest") {
-    rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  if (sort === "latest") {
+    rows.sort(
+      (a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id
+    );
   } else {
     // 기본: 마감 임박순 (상시=null은 뒤로)
     rows.sort((a, b) => {
@@ -163,6 +166,7 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
   const page = positiveInt(p.page, 1);
   const size = Math.min(MAX_SIZE, positiveInt(p.size, DEFAULT_SIZE));
   const from = (page - 1) * size;
+  const sort = p.sort === "deadline" ? "deadline" : "latest";
 
   if (USE_MOCK) {
     const result = listFromFixtures(p, page, size);
@@ -184,8 +188,10 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
   if (p.category) q = q.contains("category_ids", [p.category]);
   if (p.region && p.region !== "전국") q = q.in("region", [p.region, "전국"]);
 
-  if (p.sort === "latest") {
-    q = q.order("created_at", { ascending: false });
+  if (sort === "latest") {
+    q = q
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
   } else {
     // 기본: 마감 임박순 (상시=null은 뒤로)
     q = q.order("apply_end", { ascending: true, nullsFirst: false });

@@ -19,7 +19,7 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
     category: searchParams.category ? Number(searchParams.category) : undefined,
     region: searchParams.region,
     status: (searchParams.status as any) ?? "open",
-    sort: (searchParams.sort as any) ?? "deadline",
+    sort: (searchParams.sort as any) ?? "latest",
     page: searchParams.page ? Number(searchParams.page) : 1,
   });
   const canonicalUrl = canonicalPageUrl("/announcements", searchParams, page, total, size);
