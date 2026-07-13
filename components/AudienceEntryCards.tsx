@@ -117,7 +117,7 @@ function hrefFor(
   if (params.region) sp.set("region", params.region);
   if (params.category) sp.set("category", params.category);
   sp.set("status", params.status ?? "open");
-  sp.set("sort", params.sort ?? "deadline");
+  sp.set("sort", params.sort ?? "latest");
   sp.set("audience", audience);
   return `${basePath}?${sp.toString()}`;
 }

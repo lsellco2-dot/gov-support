@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       category: sp.get("category") ? Number(sp.get("category")) : undefined,
       region: sp.get("region") ?? undefined,
       status: (sp.get("status") as any) ?? "open",
-      sort: (sp.get("sort") as any) ?? "deadline",
+      sort: (sp.get("sort") as any) ?? "latest",
       page: sp.get("page") ? Number(sp.get("page")) : 1,
       size: sp.get("size") ? Number(sp.get("size")) : undefined,
     });
