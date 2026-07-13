@@ -8,7 +8,8 @@
     "test": "tsx --test lib/mobile/notification-feed.test.ts lib/mobile/installation-auth.test.ts lib/mobile/app-bridge.test.ts lib/mobile/open-announcements.test.ts lib/mobile/recommendations.test.ts",
     "start": "next start",
     "ingest": "curl -X POST -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/ingest",
-    "backfill:details": "tsx scripts/backfill-announcement-details.ts"
+    "backfill:details": "tsx scripts/backfill-announcement-details.ts",
+    "backfill:bizinfo-regions": "tsx scripts/backfill-bizinfo-regions.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

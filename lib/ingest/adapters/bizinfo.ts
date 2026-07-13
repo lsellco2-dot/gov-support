@@ -1,5 +1,6 @@
 import type { SourceAdapter } from "../types";
 import { buildUrl, extractItems, fetchJson, parseRange, pick, stripHtml, toDate } from "./util";
+import { inferBizinfoRegion } from "./bizinfo-region";
 
 // 기업마당(bizinfo.go.kr) 자체 오픈API — data.go.kr 인증키가 아니라
 // 기업마당 사이트에서 별도 발급하는 crtfcKey가 필요 (BIZINFO_KEY 환경변수).
@@ -45,16 +46,19 @@ export const bizinfo: SourceAdapter = {
     // pblancUrl이 상대경로("/web/...")로 오는 경우 절대경로로 보정
     const rawUrl = pick(raw, ["pblancUrl", "detailUrl", "url"]);
     const detailUrl = rawUrl?.startsWith("/") ? `https://www.bizinfo.go.kr${rawUrl}` : rawUrl;
+    const target = pick(raw, ["trgetNm", "targetNm", "aplyTrgt"]);
+    const summary = stripHtml(pick(raw, ["bsnsSumryCn", "sumryCn", "summary"]));
+    const region = inferBizinfoRegion({ title, target, summary }).region;
 
     return {
       sourceCode: "bizinfo",
       sourceKey,
       title,
       organization: pick(raw, ["jrsdInsttNm", "excInsttNm", "insttNm", "organNm"]),
-      region: pick(raw, ["areaNm", "regionNm"]) ?? "전국",
-      target: pick(raw, ["trgetNm", "targetNm", "aplyTrgt"]),
+      region,
+      target,
       supportType: pick(raw, ["pldirSportRealmLclasCodeNm", "sportRealmNm", "suptType"]),
-      summary: stripHtml(pick(raw, ["bsnsSumryCn", "sumryCn", "summary"])),
+      summary,
       applyStart: start1 ?? toDate(pick(raw, ["reqstBeginDe", "applyStart"])),
       applyEnd: end1 ?? toDate(pick(raw, ["reqstEndDe", "applyEnd"])),
       detailUrl,

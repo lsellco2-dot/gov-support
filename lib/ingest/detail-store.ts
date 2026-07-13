@@ -5,6 +5,7 @@ import {
   sourcePayloadHash,
 } from "./detail";
 import type { NormalizedAnnouncement } from "./types";
+import { inferBizinfoRegion } from "./adapters/bizinfo-region";
 
 const DETAIL_CONCURRENCY = 3;
 const LOOKUP_CHUNK = 100;
@@ -123,6 +124,15 @@ export async function fetchAndStoreDetails(
 
       try {
         const detail = await fetchAnnouncementDetail(announcement);
+        const region =
+          announcement.sourceCode === "bizinfo"
+            ? inferBizinfoRegion({
+                title: announcement.title,
+                target: announcement.target,
+                summary: announcement.summary,
+                detailContent: detail.detailContent,
+              }).region
+            : undefined;
         const { error } = await supabaseAdmin
           .from("announcements")
           .update({
@@ -137,6 +147,7 @@ export async function fetchAndStoreDetails(
             detail_fetch_attempted_at: attemptedAt,
             detail_fetch_status: "success",
             detail_fetch_error: null,
+            ...(region ? { region } : {}),
           })
           .eq("source_id", sourceId)
           .eq("source_key", announcement.sourceKey);
