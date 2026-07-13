@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { LoaderCircle, RefreshCw, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import CardApplicationDates from "./CardApplicationDates";
 import FavoriteButton from "./FavoriteButton";
 import {
   FAVORITES_CHANGED_EVENT,
@@ -82,10 +83,13 @@ export default function AppFavoritesPage() {
         <article key={item.id} className="rounded-lg border border-line bg-white p-4">
           <div className="flex items-start justify-between gap-3">
             <h2 className="min-w-0 break-words text-sm font-bold leading-snug text-ink">{item.title}</h2>
-            <StatusBadge status={item.status} />
+            <CardApplicationDates
+              applyStart={null}
+              applyEnd={item.apply_end}
+              status={item.status}
+            />
           </div>
           <p className="mt-2 break-words text-xs text-subtle">{item.agency ?? "기관 정보 없음"}</p>
-          <p className="mt-3 text-xs text-subtle">신청 마감: {item.apply_end ?? "상시/미정"}</p>
           <Link
             href={`/app/announcements/${item.id}`}
             className="mt-3 flex h-11 items-center justify-center rounded-md bg-primary text-xs font-semibold text-white"
@@ -109,17 +113,6 @@ export default function AppFavoritesPage() {
         </article>
       ))}
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: NativeFavoriteAnnouncement["status"] }) {
-  const open = status === "open";
-  return (
-    <span className={`shrink-0 rounded-badge px-2 py-1 text-[11px] font-semibold ${
-      open ? "bg-[#E8F3EA] text-open" : "bg-slate-200 text-slate-500"
-    }`}>
-      {open ? "모집중" : status === "closed" ? "모집종료" : "상태 확인"}
-    </span>
   );
 }
 

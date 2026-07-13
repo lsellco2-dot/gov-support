@@ -6,6 +6,7 @@ import { useCallback, useState } from "react";
 import { useEffect } from "react";
 import CategoryChips from "./CategoryChips";
 import FavoriteButton from "./FavoriteButton";
+import CardApplicationDates from "./CardApplicationDates";
 import {
   getRecommendationsBridgeAvailability,
   getUserCondition,
@@ -108,13 +109,14 @@ export default function AppRecommendationsPage() {
                 <h2 className="min-w-0 break-words text-sm font-bold leading-snug text-ink">
                   {announcement.title}
                 </h2>
-                <span className="shrink-0 rounded-badge bg-[#E8F3EA] px-2 py-1 text-[11px] font-semibold text-open">
-                  모집중
-                </span>
+                <CardApplicationDates
+                  applyStart={announcement.apply_start}
+                  applyEnd={announcement.apply_end}
+                  status={announcement.status}
+                />
               </div>
               <p className="mt-2 text-xs text-subtle">기관: {announcement.agency ?? "정보 없음"}</p>
               <p className="mt-1 text-xs text-subtle">지역: {announcement.region ?? "확인 필요"}</p>
-              <p className="mt-1 text-xs text-subtle">신청 마감: {announcement.apply_end ?? "상시/미정"}</p>
               <div className="mt-3">
                 <p className="mb-1 text-[11px] font-semibold text-subtle">관심 분야 일치</p>
                 <CategoryChips ids={matchedCategoryIds} />
