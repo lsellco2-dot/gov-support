@@ -8,16 +8,26 @@ import {
 test("open announcements uses page 1 and limit 50 by default", () => {
   const parsed = parseOpenAnnouncementsParams(new URLSearchParams());
   assert.equal(parsed.ok, true);
-  if (parsed.ok) assert.deepEqual(parsed.value, { page: 1, limit: 50 });
+  if (parsed.ok) assert.deepEqual(parsed.value, { page: 1, limit: 50, sort: "latest" });
 });
 
 test("open announcements caps limit at 100 and rejects invalid page", () => {
   const capped = parseOpenAnnouncementsParams(new URLSearchParams("page=2&limit=1000"));
   assert.equal(capped.ok, true);
-  if (capped.ok) assert.deepEqual(capped.value, { page: 2, limit: 100 });
+  if (capped.ok) assert.deepEqual(capped.value, { page: 2, limit: 100, sort: "latest" });
 
   const invalid = parseOpenAnnouncementsParams(new URLSearchParams("page=0"));
   assert.equal(invalid.ok, false);
+});
+
+test("open announcements supports deadline sort and defaults invalid values to latest", () => {
+  const deadline = parseOpenAnnouncementsParams(new URLSearchParams("sort=deadline"));
+  assert.equal(deadline.ok, true);
+  if (deadline.ok) assert.equal(deadline.value.sort, "deadline");
+
+  const invalid = parseOpenAnnouncementsParams(new URLSearchParams("sort=random"));
+  assert.equal(invalid.ok, true);
+  if (invalid.ok) assert.equal(invalid.value.sort, "latest");
 });
 
 test("open announcements exposes only public fields and internal detail URL", () => {

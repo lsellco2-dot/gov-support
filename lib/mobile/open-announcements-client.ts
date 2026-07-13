@@ -1,4 +1,5 @@
 import type { OpenAnnouncement } from "./recommendations";
+import type { OpenAnnouncementsSort } from "./open-announcements";
 
 export interface OpenAnnouncementsPage {
   data: OpenAnnouncement[];
@@ -11,8 +12,12 @@ export interface OpenAnnouncementsPage {
   };
 }
 
-export async function fetchOpenAnnouncements(page: number, limit = 50): Promise<OpenAnnouncementsPage> {
-  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+export async function fetchOpenAnnouncements(
+  page: number,
+  sort: OpenAnnouncementsSort = "latest",
+  limit = 50,
+): Promise<OpenAnnouncementsPage> {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit), sort });
   const response = await fetch(`/api/mobile/open-announcements?${query}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },

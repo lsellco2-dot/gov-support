@@ -10,7 +10,10 @@ const MAX_LIMIT = 100;
 export interface OpenAnnouncementsParams {
   page: number;
   limit: number;
+  sort: OpenAnnouncementsSort;
 }
+
+export type OpenAnnouncementsSort = "latest" | "deadline";
 
 type ParseResult =
   | { ok: true; value: OpenAnnouncementsParams }
@@ -25,13 +28,14 @@ export function parseOpenAnnouncementsParams(searchParams: URLSearchParams): Par
   if (limit === null) {
     return invalid("INVALID_LIMIT", "limit must be a positive integer.");
   }
-  return { ok: true, value: { page, limit: Math.min(limit, MAX_LIMIT) } };
+  const sort = searchParams.get("sort") === "deadline" ? "deadline" : "latest";
+  return { ok: true, value: { page, limit: Math.min(limit, MAX_LIMIT), sort } };
 }
 
 export async function queryOpenAnnouncements(params: OpenAnnouncementsParams) {
   return listAnnouncements({
     status: "open",
-    sort: "deadline",
+    sort: params.sort,
     page: params.page,
     size: params.limit,
   });

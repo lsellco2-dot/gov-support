@@ -13,6 +13,7 @@ import {
   type NativeUserCondition,
 } from "@/lib/mobile/app-bridge";
 import { fetchOpenAnnouncements } from "@/lib/mobile/open-announcements-client";
+import type { OpenAnnouncementsSort } from "@/lib/mobile/open-announcements";
 import {
   matchRecommendations,
   type RecommendationResult,
@@ -27,6 +28,7 @@ export default function AppRecommendationsPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [sort, setSort] = useState<OpenAnnouncementsSort>("latest");
 
   const load = useCallback(async () => {
     const availability = getRecommendationsBridgeAvailability();
@@ -41,7 +43,7 @@ export default function AppRecommendationsPage() {
         setState(conditionResult.success ? "no-condition" : "error");
         return;
       }
-      const nextPage = await fetchOpenAnnouncements(1);
+      const nextPage = await fetchOpenAnnouncements(1, sort);
       setCondition(conditionResult.data);
       setItems(matchRecommendations(conditionResult.data, nextPage.data));
       setPage(nextPage.pagination.page);
@@ -50,7 +52,7 @@ export default function AppRecommendationsPage() {
     } catch {
       setState("error");
     }
-  }, []);
+  }, [sort]);
 
   useEffect(() => {
     void load();
@@ -60,7 +62,7 @@ export default function AppRecommendationsPage() {
     if (!condition || loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const nextPage = await fetchOpenAnnouncements(page + 1);
+      const nextPage = await fetchOpenAnnouncements(page + 1, sort);
       const nextRecommendations = matchRecommendations(condition, nextPage.data);
       setItems((current) => [
         ...current,
@@ -93,6 +95,20 @@ export default function AppRecommendationsPage() {
 
   return (
     <div>
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <label htmlFor="recommendation-sort" className="text-xs font-semibold text-subtle">
+          정렬
+        </label>
+        <select
+          id="recommendation-sort"
+          value={sort}
+          onChange={(event) => setSort(event.target.value as OpenAnnouncementsSort)}
+          className="h-10 rounded-md border border-line bg-white px-3 text-xs font-semibold text-ink focus:border-primary"
+        >
+          <option value="latest">등록일 최신순</option>
+          <option value="deadline">마감 임박순</option>
+        </select>
+      </div>
       {items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line bg-white px-5 py-10 text-center">
           <Sparkles className="mx-auto text-slate-400" size={30} aria-hidden="true" />
