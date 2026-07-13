@@ -70,9 +70,7 @@ function CardApplicationDates({
         className={`shrink-0 whitespace-nowrap rounded-badge px-2 py-0.5 text-xs font-semibold tabular-nums ${
           display.tone === "urgent"
             ? "bg-[#FCE8E6] text-urgent"
-            : display.tone === "primary"
-              ? "bg-primary-light text-primary"
-              : "bg-slate-100 text-subtle"
+            : "bg-slate-100 text-subtle"
         }`}
       >
         {display.deadlineLabel}
@@ -94,8 +92,8 @@ export function getCardDateDisplay(
     !start || closed
       ? null
       : today < start
-        ? `접수예정 · ${start}`
-        : `접수중 · ${start}`;
+        ? `접수일 · ${start}`
+        : "접수중";
 
   if (!end) {
     return { receptionLabel, deadlineLabel: "상시/미정", tone: "neutral" as const };
@@ -103,7 +101,7 @@ export function getCardDateDisplay(
 
   const days = dateDifference(end, today);
   if (days < 0) {
-    return { receptionLabel: null, deadlineLabel: "마감", tone: "neutral" as const };
+    return { receptionLabel: null, deadlineLabel: "마감", tone: "urgent" as const };
   }
   if (days === 0) {
     return { receptionLabel, deadlineLabel: "오늘 마감", tone: "urgent" as const };
@@ -111,7 +109,7 @@ export function getCardDateDisplay(
   return {
     receptionLabel,
     deadlineLabel: `마감일 - ${days}`,
-    tone: days <= 7 ? ("urgent" as const) : ("primary" as const),
+    tone: "urgent" as const,
   };
 }
 
