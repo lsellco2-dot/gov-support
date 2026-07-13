@@ -2,26 +2,27 @@
 
 import { useState } from "react";
 import {
-  getAppSettingsBridgeAvailability,
-  openAppSettings,
+  getUserConditionSettingsBridgeAvailability,
+  openUserConditionSettings,
 } from "@/lib/mobile/app-bridge";
 
-const APP_ONLY_MESSAGE = "설정 기능은 정부지원AI비서 앱에서 사용할 수 있습니다.";
+const UPDATE_APP_MESSAGE =
+  "정부지원AI비서 앱을 최신 버전으로 업데이트하면 내 정보를 설정할 수 있습니다.";
 
 export default function AppSettingsEntry() {
   const [message, setMessage] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
 
   async function handleOpenSettings() {
-    if (getAppSettingsBridgeAvailability() !== "available") {
-      setMessage(APP_ONLY_MESSAGE);
+    if (getUserConditionSettingsBridgeAvailability() !== "available") {
+      setMessage(UPDATE_APP_MESSAGE);
       return;
     }
 
     setOpening(true);
     setMessage(null);
-    const result = await openAppSettings();
-    if (!result.success) setMessage(APP_ONLY_MESSAGE);
+    const result = await openUserConditionSettings();
+    if (!result.success) setMessage(UPDATE_APP_MESSAGE);
     setOpening(false);
   }
 

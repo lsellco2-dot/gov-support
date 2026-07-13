@@ -7,9 +7,11 @@ import {
   getFavoritesBridgeAvailability,
   getAppSettingsBridgeAvailability,
   getRecommendationsBridgeAvailability,
+  getUserConditionSettingsBridgeAvailability,
   isAppBridgeAvailable,
   isFavorite,
   openAppSettings,
+  openUserConditionSettings,
   removeFavorite,
 } from "./app-bridge";
 
@@ -17,6 +19,7 @@ test("distinguishes browser and outdated app bridges", async () => {
   clearWindow();
   assert.equal(getFavoritesBridgeAvailability(), "browser");
   assert.equal(getAppSettingsBridgeAvailability(), "browser");
+  assert.equal(getUserConditionSettingsBridgeAvailability(), "browser");
   assert.equal(getRecommendationsBridgeAvailability(), "browser");
   assert.equal(isAppBridgeAvailable(), false);
   assert.equal(await getAppInstallationContext(), null);
@@ -24,6 +27,7 @@ test("distinguishes browser and outdated app bridges", async () => {
   setWindow({ getInstallationContext: () => "{}" });
   assert.equal(getFavoritesBridgeAvailability(), "outdated");
   assert.equal(getAppSettingsBridgeAvailability(), "outdated");
+  assert.equal(getUserConditionSettingsBridgeAvailability(), "outdated");
   assert.equal(getRecommendationsBridgeAvailability(), "outdated");
   clearWindow();
 });
@@ -54,6 +58,7 @@ test("keeps legacy installation context and parses favorite methods", async () =
       schema_version: 1,
     }),
     openAppSettings: async () => success({ opened: true }),
+    openUserConditionSettings: async () => success({ opened: true }),
   });
 
   assert.equal(isAppBridgeAvailable(), true);
@@ -62,6 +67,7 @@ test("keeps legacy installation context and parses favorite methods", async () =
   assert.deepEqual(await isFavorite(1), { success: true, data: true });
   assert.deepEqual(await removeFavorite(1), { success: true, data: true });
   assert.deepEqual(await openAppSettings(), { success: true, data: true });
+  assert.deepEqual(await openUserConditionSettings(), { success: true, data: true });
 
   const added = await addFavorite({
     id: 1,
