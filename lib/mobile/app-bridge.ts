@@ -57,6 +57,7 @@ interface NativeAppBridge {
   addFavorite?: (announcementJson: string) => BridgeReturn;
   removeFavorite?: (announcementId: number) => BridgeReturn;
   getUserCondition?: () => BridgeReturn;
+  openAppSettings?: () => BridgeReturn;
 }
 
 declare global {
@@ -85,6 +86,10 @@ export function getFavoritesBridgeAvailability(): BridgeAvailability {
 
 export function getRecommendationsBridgeAvailability(): BridgeAvailability {
   return bridgeAvailability(["getUserCondition", ...favoriteMethods]);
+}
+
+export function getAppSettingsBridgeAvailability(): BridgeAvailability {
+  return bridgeAvailability(["openAppSettings"]);
 }
 
 export function isAppBridgeAvailable() {
@@ -144,6 +149,15 @@ export async function getUserCondition(): Promise<NativeResult<NativeUserConditi
   if (!result.success) return result;
   const condition = normalizeUserCondition(result.data);
   return condition ? { success: true, data: condition } : invalidBridgeResponse();
+}
+
+export async function openAppSettings(): Promise<NativeResult<boolean>> {
+  const result = await callNativeResult<unknown>("openAppSettings", []);
+  if (!result.success) return result;
+  if (!isRecord(result.data) || result.data.opened !== true) {
+    return invalidBridgeResponse();
+  }
+  return { success: true, data: true };
 }
 
 function bridgeAvailability(methods: readonly (keyof NativeAppBridge)[]): BridgeAvailability {

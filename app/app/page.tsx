@@ -1,4 +1,5 @@
 import AudienceEntryCards from "@/components/AudienceEntryCards";
+import AppSettingsEntry from "@/components/AppSettingsEntry";
 
 export const dynamic = "force-dynamic";
 
@@ -6,15 +7,7 @@ export const dynamic = "force-dynamic";
 export default function AppHome() {
   return (
     <div>
-      <section className="rounded-xl border border-line bg-white px-4 py-8 text-center">
-        <p className="text-base font-semibold text-primary">정부지원AI비서</p>
-        <h1 className="mt-2 text-2xl font-bold leading-snug text-ink sm:text-3xl">
-          AI 맞춤 설정하기
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-subtle sm:text-base">
-          나에게 맞는 맞춤 공고를 설정하세요.
-        </p>
-      </section>
+      <AppSettingsEntry />
 
       <section className="mt-6">
         <h2 className="text-sm font-bold text-ink">무엇을 찾으시나요?</h2>
