@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import {
-  getUserConditionSettingsBridgeAvailability,
-  openUserConditionSettings,
+  getAppSettingsBridgeAvailability,
+  openAppSettings,
 } from "@/lib/mobile/app-bridge";
 
 const UPDATE_APP_MESSAGE =
@@ -14,14 +14,14 @@ export default function AppSettingsEntry() {
   const [opening, setOpening] = useState(false);
 
   async function handleOpenSettings() {
-    if (getUserConditionSettingsBridgeAvailability() !== "available") {
+    if (getAppSettingsBridgeAvailability() !== "available") {
       setMessage(UPDATE_APP_MESSAGE);
       return;
     }
 
     setOpening(true);
     setMessage(null);
-    const result = await openUserConditionSettings();
+    const result = await openAppSettings();
     if (!result.success) setMessage(UPDATE_APP_MESSAGE);
     setOpening(false);
   }
