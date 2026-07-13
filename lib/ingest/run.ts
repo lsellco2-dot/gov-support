@@ -9,6 +9,12 @@ import {
   loadExistingDetailStates,
   needsDetailFetch,
 } from "./detail-store";
+import {
+  canonicalTitle,
+  createDuplicateIndex,
+  isPreferredSourceDuplicate,
+  type DuplicateIndex,
+} from "./cross-source-dedup";
 
 const CHUNK = 500;
 const EXPIRED_RETENTION_DAYS = 2;
@@ -23,6 +29,7 @@ export interface IngestResult {
   detailsSkipped: number;
   detailsPending: number;
   detailSchemaReady?: boolean;
+  duplicatesSkipped: number;
   error?: string;
 }
 
@@ -53,11 +60,17 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
       detailsFailed: 0,
       detailsSkipped: 0,
       detailsPending: 0,
+      duplicatesSkipped: 0,
     };
     let detailBudget = detailFetchLimitPerSource();
     let detailSchemaReady: boolean | undefined;
+    let preferredSourceIndex: DuplicateIndex | null = null;
+    const seenMssTitles = new Set<string>();
 
     try {
+      if (adapter.sourceCode === "mss") {
+        preferredSourceIndex = await loadPreferredSourceDuplicateIndex();
+      }
       for await (const page of adapter.fetchPages({ serviceKey })) {
         const prepared: Array<{
           normalized: NormalizedAnnouncement;
@@ -66,6 +79,22 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
         for (const raw of page) {
           const n = adapter.normalize(raw);
           if (!n) { r.skipped++; continue; }
+          if (adapter.sourceCode === "mss") {
+            const canonical = canonicalTitle(n.title);
+            if (
+              seenMssTitles.has(canonical) ||
+              (preferredSourceIndex &&
+                isPreferredSourceDuplicate(
+                  { title: n.title, applyEnd: n.applyEnd },
+                  preferredSourceIndex
+                ))
+            ) {
+              r.skipped++;
+              r.duplicatesSkipped++;
+              continue;
+            }
+            seenMssTitles.add(canonical);
+          }
           if (n.applyEnd && n.applyEnd < deleteBefore) {
             r.skipped++;
             continue;
@@ -192,6 +221,10 @@ function toRow(n: NormalizedAnnouncement) {
     summary: sanitizeDisplayText(n.summary),
   };
 
+  const attachments = n.attachments
+    ?.map(({ label, url }) => ({ label: sanitizeDisplayText(label), url }))
+    .filter(({ label }) => label.length > 0);
+
   return {
     source_id: SOURCE_ID[clean.sourceCode],
     source_key: clean.sourceKey,
@@ -207,6 +240,29 @@ function toRow(n: NormalizedAnnouncement) {
     detail_url: clean.detailUrl,
     content_hash: contentHash(clean),
     raw_json: clean.raw,
+    ...(attachments && attachments.length > 0 ? { attachments } : {}),
     updated_at: new Date().toISOString(),
   };
+}
+
+async function loadPreferredSourceDuplicateIndex() {
+  const rows: Array<{ title: string; apply_end: string | null }> = [];
+  const pageSize = 1_000;
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin
+      .from("announcements")
+      .select("title,apply_end")
+      .in("source_id", [SOURCE_ID.bizinfo, SOURCE_ID.kstartup])
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`중복 기준 공고 조회 실패: ${error.message}`);
+
+    const page = (data ?? []) as Array<{ title: string; apply_end: string | null }>;
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return createDuplicateIndex(
+    rows.map((row) => ({ title: row.title, applyEnd: row.apply_end }))
+  );
 }

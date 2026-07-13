@@ -8,6 +8,11 @@ export const SOURCE_ID: Record<SourceCode, number> = {
   msit: 5,
 };
 
+export interface NormalizedAttachment {
+  label: string;
+  url: string;
+}
+
 export interface NormalizedAnnouncement {
   sourceCode: SourceCode;
   sourceKey: string;
@@ -20,6 +25,7 @@ export interface NormalizedAnnouncement {
   applyStart: string | null; // 'YYYY-MM-DD'
   applyEnd: string | null;   // null = 상시/미상
   detailUrl: string | null;
+  attachments?: NormalizedAttachment[];
   raw: unknown;
 }
 

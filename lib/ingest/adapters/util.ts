@@ -80,22 +80,48 @@ export async function fetchJson(url: string): Promise<any> {
 }
 
 /** XML 전용 API(과기부 등)용: <item>...</item> 블록을 평면 객체 배열로 파싱 */
-export async function fetchXmlItems(url: string): Promise<Record<string, string>[]> {
+export type XmlItem = Record<string, string | string[]>;
+
+export async function fetchXmlItems(url: string): Promise<XmlItem[]> {
   const res = await fetch(url, {
     cache: "no-store",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const text = await res.text();
-  const items: Record<string, string>[] = [];
+  return parseXmlItems(text);
+}
+
+/**
+ * 공공데이터포털 XML의 item 목록을 파싱한다.
+ * CDATA와 fileName/fileUrl처럼 반복되는 태그를 함께 지원한다.
+ */
+export function parseXmlItems(text: string): XmlItem[] {
+  const items: XmlItem[] = [];
   for (const [, block] of Array.from(text.matchAll(/<item>([\s\S]*?)<\/item>/g))) {
-    const obj: Record<string, string> = {};
-    for (const [, tag, val] of Array.from(block.matchAll(/<(\w+)>([^<]*)<\/\1>/g))) {
-      obj[tag] = decodeXmlEntities(val.trim());
+    const obj: XmlItem = {};
+    for (const [, tag, rawValue] of Array.from(
+      block.matchAll(/<([A-Za-z0-9_:-]+)\b[^>]*>([\s\S]*?)<\/\1>/g)
+    )) {
+      const value = decodeXmlValue(rawValue);
+      const existing = obj[tag];
+      if (existing === undefined) {
+        obj[tag] = value;
+      } else if (Array.isArray(existing)) {
+        existing.push(value);
+      } else {
+        obj[tag] = [existing, value];
+      }
     }
     items.push(obj);
   }
   return items;
+}
+
+function decodeXmlValue(value: string) {
+  const trimmed = value.trim();
+  const cdata = trimmed.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
+  return decodeXmlEntities((cdata?.[1] ?? trimmed).trim());
 }
 
 function decodeXmlEntities(s: string): string {
