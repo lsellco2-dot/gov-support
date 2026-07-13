@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { LoaderCircle, RefreshCw, Star } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import CardApplicationDates from "./CardApplicationDates";
 import FavoriteButton from "./FavoriteButton";
 import {
@@ -11,12 +11,18 @@ import {
   getFavoritesBridgeAvailability,
   type NativeFavoriteAnnouncement,
 } from "@/lib/mobile/app-bridge";
+import {
+  sortFavoriteAnnouncements,
+  type FavoriteSort,
+} from "@/lib/mobile/favorite-sort";
 
 type State = "loading" | "browser" | "outdated" | "empty" | "ready" | "error";
 
 export default function AppFavoritesPage() {
   const [state, setState] = useState<State>("loading");
   const [items, setItems] = useState<NativeFavoriteAnnouncement[]>([]);
+  const [sort, setSort] = useState<FavoriteSort>("latest");
+  const sortedItems = useMemo(() => sortFavoriteAnnouncements(items, sort), [items, sort]);
 
   const load = useCallback(async () => {
     const availability = getFavoritesBridgeAvailability();
@@ -79,7 +85,21 @@ export default function AppFavoritesPage() {
 
   return (
     <div className="space-y-3">
-      {items.map((item) => (
+      <div className="flex items-center justify-end gap-2">
+        <label htmlFor="favorite-sort" className="text-xs font-semibold text-subtle">
+          정렬
+        </label>
+        <select
+          id="favorite-sort"
+          value={sort}
+          onChange={(event) => setSort(event.target.value as FavoriteSort)}
+          className="h-10 rounded-md border border-line bg-white px-3 text-xs font-semibold text-ink focus:border-primary"
+        >
+          <option value="latest">최근 저장순</option>
+          <option value="deadline">마감 임박순</option>
+        </select>
+      </div>
+      {sortedItems.map((item) => (
         <article key={item.id} className="rounded-lg border border-line bg-white p-4">
           <div className="flex items-start justify-between gap-3">
             <h2 className="min-w-0 break-words text-sm font-bold leading-snug text-ink">{item.title}</h2>
