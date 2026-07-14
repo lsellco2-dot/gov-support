@@ -12,15 +12,13 @@ import {
   getUserCondition,
   type NativeUserCondition,
 } from "@/lib/mobile/app-bridge";
-import { fetchOpenAnnouncements } from "@/lib/mobile/open-announcements-client";
 import type { OpenAnnouncementsSort } from "@/lib/mobile/open-announcements";
 import {
-  filterNationwideRecommendations,
   isNationwideUserRegion,
-  matchRecommendations,
   type RecommendationResult,
 } from "@/lib/mobile/recommendations";
 import { announcementSourceLabel } from "@/lib/mobile/announcement-source";
+import { loadRecommendationBatch } from "@/lib/mobile/recommendation-pages";
 
 type State = "loading" | "browser" | "outdated" | "ready" | "error" | "no-condition";
 
@@ -29,7 +27,8 @@ export default function AppRecommendationsPage() {
   const [condition, setCondition] = useState<NativeUserCondition | null>(null);
   const [items, setItems] = useState<RecommendationResult[]>([]);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  const [pendingItems, setPendingItems] = useState<RecommendationResult[]>([]);
+  const [hasMoreCandidates, setHasMoreCandidates] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sort, setSort] = useState<OpenAnnouncementsSort>("latest");
   const [includeNationwide, setIncludeNationwide] = useState(true);
@@ -47,17 +46,18 @@ export default function AppRecommendationsPage() {
         setState(conditionResult.success ? "no-condition" : "error");
         return;
       }
-      const nextPage = await fetchOpenAnnouncements(1, sort);
+      const batch = await loadRecommendationBatch({
+        condition: conditionResult.data,
+        sort,
+        includeNationwide,
+        currentPage: 0,
+        hasMoreCandidates: true,
+      });
       setCondition(conditionResult.data);
-      setItems(
-        filterNationwideRecommendations(
-          matchRecommendations(conditionResult.data, nextPage.data),
-          conditionResult.data.region,
-          includeNationwide,
-        ),
-      );
-      setPage(nextPage.pagination.page);
-      setHasMore(nextPage.pagination.has_more);
+      setItems(batch.items);
+      setPendingItems(batch.pending);
+      setPage(batch.lastPage);
+      setHasMoreCandidates(batch.hasMoreCandidates);
       setState("ready");
     } catch {
       setState("error");
@@ -69,29 +69,35 @@ export default function AppRecommendationsPage() {
   }, [load]);
 
   async function loadMore() {
+    const hasMore = pendingItems.length > 0 || hasMoreCandidates;
     if (!condition || loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
-      const nextPage = await fetchOpenAnnouncements(page + 1, sort);
-      const nextRecommendations = filterNationwideRecommendations(
-        matchRecommendations(condition, nextPage.data),
-        condition.region,
+      const batch = await loadRecommendationBatch({
+        condition,
+        sort,
         includeNationwide,
-      );
+        currentPage: page,
+        hasMoreCandidates,
+        pending: pendingItems,
+      });
       setItems((current) => [
         ...current,
-        ...nextRecommendations.filter(
+        ...batch.items.filter(
           (candidate) => !current.some((item) => item.announcement.id === candidate.announcement.id),
         ),
       ]);
-      setPage(nextPage.pagination.page);
-      setHasMore(nextPage.pagination.has_more);
+      setPendingItems(batch.pending);
+      setPage(batch.lastPage);
+      setHasMoreCandidates(batch.hasMoreCandidates);
     } catch {
       setState("error");
     } finally {
       setLoadingMore(false);
     }
   }
+
+  const hasMore = pendingItems.length > 0 || hasMoreCandidates;
 
   if (state === "loading") return <Status icon="loading" text="AI추천 공고를 불러오는 중입니다." />;
   if (state === "browser") {

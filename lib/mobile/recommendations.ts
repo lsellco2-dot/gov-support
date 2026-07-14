@@ -89,7 +89,9 @@ export function filterNationwideRecommendations(
 ) {
   if (includeNationwide || isNationwideUserRegion(userRegion)) return recommendations;
   return recommendations.filter(
-    ({ announcement }) => !isNationwideRegion(announcement.region),
+    ({ announcement }) =>
+      Boolean(announcement.region?.trim()) &&
+      !isNationwideRegion(announcement.region),
   );
 }
 

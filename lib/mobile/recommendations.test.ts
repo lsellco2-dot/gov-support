@@ -112,7 +112,7 @@ test("Seoul user can include or exclude nationwide announcements", () => {
     filterNationwideRecommendations(recommendations, "seoul", false).map(
       ({ announcement: item }) => item.id,
     ),
-    [1, 3],
+    [1],
   );
 });
 
@@ -134,7 +134,7 @@ test("nationwide users keep all matched regions and do not need the filter", () 
   );
 });
 
-test("applies the same nationwide filter to later pages and preserves unknown regions", () => {
+test("applies the same nationwide filter to later pages and excludes unknown regions", () => {
   const firstPage = matchRecommendations(condition, [
     { ...announcement, id: 1, region: "서울" },
     { ...announcement, id: 2, region: "전국" },
@@ -149,5 +149,5 @@ test("applies the same nationwide filter to later pages and preserves unknown re
       ({ announcement: filtered }) => filtered.id,
     ),
   );
-  assert.deepEqual(ids, [1, 3]);
+  assert.deepEqual(ids, [1]);
 });
