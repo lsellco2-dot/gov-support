@@ -3,6 +3,7 @@ import { load, type Cheerio, type CheerioAPI } from "cheerio";
 import type { AnyNode } from "domhandler";
 import { B_CLOSE, B_OPEN, EM_CLOSE, EM_OPEN } from "@/lib/text/emphasis";
 import type { NormalizedAnnouncement, SourceCode } from "./types";
+import { extractMsitAttachments } from "./msit-attachments";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
@@ -81,7 +82,10 @@ export async function fetchAnnouncementDetail(
     announcement.sourceCode === "kstartup" ? extractKstartupSections($) : emptySections();
   const detailContent =
     sectionDetails.fullText || extractMainText($, SOURCE_SELECTORS[announcement.sourceCode]);
-  const attachments = extractAttachments($, finalUrl);
+  const attachments = mergeAttachmentLinks(
+    extractAttachments($, finalUrl),
+    announcement.sourceCode === "msit" ? extractMsitAttachments($, finalUrl) : []
+  );
 
   if (!detailContent || detailContent.length < 20) {
     if (
@@ -120,8 +124,12 @@ export async function fetchAnnouncementDetail(
   };
 }
 
-export function sourcePayloadHash(value: unknown) {
-  return createHash("sha256").update(stableStringify(value)).digest("hex");
+export function sourcePayloadHash(value: unknown, sourceCode?: SourceCode) {
+  const parserVersion = sourceCode === "msit" ? "\nmsit-detail-v2" : "";
+  return createHash("sha256")
+    .update(stableStringify(value))
+    .update(parserVersion)
+    .digest("hex");
 }
 
 function validateDetailUrl(source: SourceCode, value: string | null) {
@@ -462,6 +470,20 @@ function extractAttachments($: CheerioAPI, baseUrl: URL) {
   });
 
   return links;
+}
+
+function mergeAttachmentLinks(
+  primary: StoredDetailLink[],
+  secondary: StoredDetailLink[]
+) {
+  const seen = new Set<string>();
+  return [...primary, ...secondary]
+    .filter((link) => {
+      if (seen.has(link.url)) return false;
+      seen.add(link.url);
+      return true;
+    })
+    .slice(0, MAX_ATTACHMENTS);
 }
 
 function isPrivateHostname(hostname: string) {

@@ -1,6 +1,7 @@
 import { supabaseAnon } from "@/lib/supabase/anon";
 import { FIXTURES } from "./fixtures";
 import { sanitizeDisplayRow, sanitizeDisplayText } from "@/lib/text/sanitize";
+import { normalizeMsitAttachmentProxyUrl } from "@/lib/ingest/msit-attachments";
 
 // Supabase 미연결 상태에서 UI 개발용: fixtures를 메모리에서 검색/필터/정렬/페이지네이션
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
@@ -498,7 +499,9 @@ function storedLinks(value: unknown): DetailLink[] {
     if (!item || typeof item !== "object") return [];
     const record = item as Record<string, unknown>;
     const label = sanitizeDisplayText(String(record.label ?? "")).trim();
-    const url = safeHttpUrl(String(record.url ?? ""));
+    const rawUrl = String(record.url ?? "");
+    const url =
+      safeHttpUrl(rawUrl) ?? normalizeMsitAttachmentProxyUrl(rawUrl);
     return label && url ? [{ label, url }] : [];
   });
 }

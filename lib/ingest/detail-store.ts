@@ -76,7 +76,10 @@ export function needsDetailFetch(
 ) {
   if (!announcement.detailUrl) return false;
   if (existing?.detail_fetched_at) {
-    return existing.detail_source_hash !== sourcePayloadHash(announcement.raw);
+    return (
+      existing.detail_source_hash !==
+      sourcePayloadHash(announcement.raw, announcement.sourceCode)
+    );
   }
   if (existing?.detail_fetch_error === FINAL_EMPTY_SHELL_ERROR) {
     return (
@@ -142,7 +145,10 @@ export async function fetchAndStoreDetails(
             contact: detail.contact,
             attachments: detail.attachments,
             detail_content_hash: detail.contentHash,
-            detail_source_hash: sourcePayloadHash(announcement.raw),
+            detail_source_hash: sourcePayloadHash(
+              announcement.raw,
+              announcement.sourceCode
+            ),
             detail_fetched_at: attemptedAt,
             detail_fetch_attempted_at: attemptedAt,
             detail_fetch_status: "success",
