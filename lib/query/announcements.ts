@@ -9,7 +9,12 @@ export interface ListParams {
   q?: string;
   audience?: AudienceGroup;
   category?: number;
+  categoryIds?: number[];
   region?: string;
+  recommendationRegion?: {
+    label: string;
+    includeNationwide: boolean;
+  };
   status?: "open" | "closed" | "all";
   sort?: "deadline" | "latest";
   page?: number;
@@ -133,8 +138,20 @@ function listFromFixtures(p: ListParams, page: number, size: number) {
     const needle = p.q.toLowerCase();
     rows = rows.filter((r) => r.title.toLowerCase().includes(needle));
   }
-  if (p.category) rows = rows.filter((r) => r.category_ids.includes(p.category!));
-  if (p.region && p.region !== "전국") {
+  if (p.categoryIds?.length) {
+    const categoryIds = new Set(p.categoryIds);
+    rows = rows.filter((r) => r.category_ids.some((id) => categoryIds.has(id)));
+  } else if (p.category) {
+    rows = rows.filter((r) => r.category_ids.includes(p.category!));
+  }
+  if (p.recommendationRegion) {
+    const { label, includeNationwide } = p.recommendationRegion;
+    rows = rows.filter((r) => {
+      const region = r.region?.trim() ?? "";
+      if (!region) return includeNationwide;
+      return region === label || (includeNationwide && region === "전국");
+    });
+  } else if (p.region && p.region !== "전국") {
     rows = rows.filter((r) => r.region === p.region || r.region === "전국");
   }
 
@@ -185,8 +202,19 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
   if (status !== "all") q = q.eq("status", status);
   q = applyTextSearch(q, p.q);
   q = applyAudienceFilter(q, p.audience);
-  if (p.category) q = q.contains("category_ids", [p.category]);
-  if (p.region && p.region !== "전국") q = q.in("region", [p.region, "전국"]);
+  if (p.categoryIds?.length) {
+    q = q.overlaps("category_ids", p.categoryIds);
+  } else if (p.category) {
+    q = q.contains("category_ids", [p.category]);
+  }
+  if (p.recommendationRegion) {
+    const { label, includeNationwide } = p.recommendationRegion;
+    q = includeNationwide
+      ? q.or(`region.eq.${label},region.eq.전국,region.is.null`)
+      : q.eq("region", label);
+  } else if (p.region && p.region !== "전국") {
+    q = q.in("region", [p.region, "전국"]);
+  }
 
   if (sort === "latest") {
     q = q

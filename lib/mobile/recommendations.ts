@@ -38,17 +38,25 @@ export interface RecommendationResult {
 
 type FieldMatch = "match" | "conflict" | "unknown";
 
+export function recommendationCategoryIds(condition: NativeUserCondition) {
+  return [...new Set(
+    condition.interests
+      .map((code) => INTEREST_CATEGORY_IDS[code])
+      .filter((id): id is number => typeof id === "number"),
+  )].sort((a, b) => a - b);
+}
+
+export function recommendationRegionLabel(region: string) {
+  return REGION_LABELS[region.trim().toLowerCase()] ?? null;
+}
+
 export function evaluateRecommendation(
   condition: NativeUserCondition,
   announcement: OpenAnnouncement,
 ): RecommendationResult | null {
   if (announcement.status !== "open" || !condition.onboarding_completed) return null;
 
-  const interestedIds = new Set(
-    condition.interests
-      .map((code) => INTEREST_CATEGORY_IDS[code])
-      .filter((id): id is number => typeof id === "number"),
-  );
+  const interestedIds = new Set(recommendationCategoryIds(condition));
   const matchedCategoryIds = announcement.category_ids
     .filter((id) => interestedIds.has(id))
     .filter((id, index, values) => values.indexOf(id) === index)

@@ -33,7 +33,7 @@ export default function AppRecommendationsPage() {
   const [sort, setSort] = useState<OpenAnnouncementsSort>("latest");
   const [includeNationwide, setIncludeNationwide] = useState(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     const availability = getRecommendationsBridgeAvailability();
     if (availability !== "available") {
       setState(availability);
@@ -42,6 +42,7 @@ export default function AppRecommendationsPage() {
     setState("loading");
     try {
       const conditionResult = await getUserCondition();
+      if (signal?.aborted) return;
       if (!conditionResult.success || !conditionResult.data.onboarding_completed) {
         setState(conditionResult.success ? "no-condition" : "error");
         return;
@@ -52,7 +53,9 @@ export default function AppRecommendationsPage() {
         includeNationwide,
         currentPage: 0,
         hasMoreCandidates: true,
+        signal,
       });
+      if (signal?.aborted) return;
       setCondition(conditionResult.data);
       setItems(batch.items);
       setPendingItems(batch.pending);
@@ -60,12 +63,15 @@ export default function AppRecommendationsPage() {
       setHasMoreCandidates(batch.hasMoreCandidates);
       setState("ready");
     } catch {
+      if (signal?.aborted) return;
       setState("error");
     }
   }, [includeNationwide, sort]);
 
   useEffect(() => {
-    void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
   }, [load]);
 
   async function loadMore() {

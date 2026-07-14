@@ -16,7 +16,14 @@ const condition: NativeUserCondition = {
 };
 
 test("continues past an empty filtered candidate page before showing empty state", async () => {
-  const calls: Array<{ page: number; sort: string; limit: number }> = [];
+  const calls: Array<{
+    page: number;
+    sort: string;
+    limit: number;
+    categories: number[];
+    userRegion: string;
+    includeNationwide: boolean;
+  }> = [];
   const pages = new Map([
     [1, candidatePage(1, [announcement(1, "전국"), announcement(2, null)], true)],
     [2, candidatePage(2, [announcement(3, "서울")], false)],
@@ -29,17 +36,57 @@ test("continues past an empty filtered candidate page before showing empty state
     currentPage: 0,
     hasMoreCandidates: true,
     batchSize: 1,
-    fetchPage: async (page, sort, limit) => {
-      calls.push({ page, sort, limit });
+    fetchPage: async (page, sort, limit, filter) => {
+      calls.push({
+        page,
+        sort,
+        limit,
+        categories: filter.categoryIds,
+        userRegion: filter.userRegion,
+        includeNationwide: filter.includeNationwide,
+      });
       return pages.get(page)!;
     },
   });
 
   assert.deepEqual(batch.items.map(({ announcement: item }) => item.id), [3]);
   assert.deepEqual(calls, [
-    { page: 1, sort: "latest", limit: 100 },
-    { page: 2, sort: "latest", limit: 100 },
+    {
+      page: 1,
+      sort: "latest",
+      limit: 100,
+      categories: [3],
+      userRegion: "seoul",
+      includeNationwide: false,
+    },
+    {
+      page: 2,
+      sort: "latest",
+      limit: 100,
+      categories: [3],
+      userRegion: "seoul",
+      includeNationwide: false,
+    },
   ]);
+  assert.equal(batch.hasMoreCandidates, false);
+});
+
+test("skips candidate API calls when no supported interest category is selected", async () => {
+  let calls = 0;
+  const batch = await loadRecommendationBatch({
+    condition: { ...condition, interests: ["unsupported"] },
+    sort: "latest",
+    includeNationwide: true,
+    currentPage: 0,
+    hasMoreCandidates: true,
+    fetchPage: async () => {
+      calls += 1;
+      return candidatePage(1, [], false);
+    },
+  });
+
+  assert.equal(calls, 0);
+  assert.deepEqual(batch.items, []);
   assert.equal(batch.hasMoreCandidates, false);
 });
 

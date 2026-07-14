@@ -12,15 +12,24 @@ export interface OpenAnnouncementsPage {
   };
 }
 
+export interface OpenAnnouncementsCandidateFilter {
+  categoryIds: number[];
+  userRegion: string;
+  includeNationwide: boolean;
+}
+
 export async function fetchOpenAnnouncements(
   page: number,
   sort: OpenAnnouncementsSort = "latest",
   limit = 50,
+  filter?: OpenAnnouncementsCandidateFilter,
+  signal?: AbortSignal,
 ): Promise<OpenAnnouncementsPage> {
-  const query = buildOpenAnnouncementsQuery(page, sort, limit);
+  const query = buildOpenAnnouncementsQuery(page, sort, limit, filter);
   const response = await fetch(`/api/mobile/open-announcements?${query}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },
+    signal,
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok || !isOpenAnnouncementsPage(payload)) {
@@ -33,8 +42,15 @@ export function buildOpenAnnouncementsQuery(
   page: number,
   sort: OpenAnnouncementsSort,
   limit: number,
+  filter?: OpenAnnouncementsCandidateFilter,
 ) {
-  return new URLSearchParams({ page: String(page), limit: String(limit), sort });
+  const query = new URLSearchParams({ page: String(page), limit: String(limit), sort });
+  if (filter) {
+    query.set("categories", [...new Set(filter.categoryIds)].sort((a, b) => a - b).join(","));
+    query.set("user_region", filter.userRegion);
+    query.set("include_nationwide", String(filter.includeNationwide));
+  }
+  return query;
 }
 
 function isOpenAnnouncementsPage(value: unknown): value is OpenAnnouncementsPage {

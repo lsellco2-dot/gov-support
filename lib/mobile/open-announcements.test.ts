@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildOpenAnnouncementsListParams,
   buildOpenAnnouncementsPayload,
   parseOpenAnnouncementsParams,
 } from "./open-announcements";
@@ -39,6 +40,57 @@ test("later page requests preserve the selected sort", () => {
   assert.equal(
     buildOpenAnnouncementsQuery(3, "deadline", 50).toString(),
     "page=3&limit=50&sort=deadline",
+  );
+});
+
+test("recommendation candidate filters are validated and forwarded before pagination", () => {
+  const parsed = parseOpenAnnouncementsParams(new URLSearchParams(
+    "page=2&limit=100&sort=deadline&categories=3,1,3&user_region=seoul&include_nationwide=false",
+  ));
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+
+  assert.deepEqual(parsed.value, {
+    page: 2,
+    limit: 100,
+    sort: "deadline",
+    categoryIds: [1, 3],
+    userRegion: "seoul",
+    includeNationwide: false,
+  });
+  assert.deepEqual(buildOpenAnnouncementsListParams(parsed.value), {
+    status: "open",
+    sort: "deadline",
+    page: 2,
+    size: 100,
+    categoryIds: [1, 3],
+    recommendationRegion: { label: "서울", includeNationwide: false },
+  });
+});
+
+test("recommendation query keeps category and region filters on later pages", () => {
+  assert.equal(
+    buildOpenAnnouncementsQuery(3, "latest", 100, {
+      categoryIds: [3, 1, 3],
+      userRegion: "seoul",
+      includeNationwide: true,
+    }).toString(),
+    "page=3&limit=100&sort=latest&categories=1%2C3&user_region=seoul&include_nationwide=true",
+  );
+});
+
+test("recommendation candidate filters reject unsupported public values", () => {
+  assert.equal(
+    parseOpenAnnouncementsParams(new URLSearchParams("categories=10")).ok,
+    false,
+  );
+  assert.equal(
+    parseOpenAnnouncementsParams(new URLSearchParams("user_region=unknown")).ok,
+    false,
+  );
+  assert.equal(
+    parseOpenAnnouncementsParams(new URLSearchParams("include_nationwide=maybe")).ok,
+    false,
   );
 });
 
