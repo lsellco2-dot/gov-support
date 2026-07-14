@@ -3,6 +3,7 @@ import {
   type AnnouncementListResult,
   type AnnouncementRow,
 } from "@/lib/query/announcements";
+import { announcementSourceCode } from "./announcement-source";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -61,6 +62,7 @@ export function buildOpenAnnouncementsPayload(
 function toPublicItem(item: AnnouncementRow, origin: string) {
   return {
     id: item.id,
+    source: announcementSourceCode(item.source_id),
     title: item.title,
     agency: item.organization,
     category_ids: item.category_ids,

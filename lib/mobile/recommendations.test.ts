@@ -3,7 +3,10 @@ import test from "node:test";
 import type { NativeUserCondition } from "./app-bridge";
 import {
   evaluateRecommendation,
+  filterNationwideRecommendations,
   INTEREST_CATEGORY_IDS,
+  isNationwideUserRegion,
+  matchRecommendations,
   type OpenAnnouncement,
 } from "./recommendations";
 
@@ -90,4 +93,61 @@ test("excludes category region target conflicts and closed announcements", () =>
     evaluateRecommendation(condition, { ...announcement, status: "closed" as "open" }),
     null,
   );
+});
+
+test("Seoul user can include or exclude nationwide announcements", () => {
+  const recommendations = matchRecommendations(condition, [
+    { ...announcement, id: 1, region: "서울" },
+    { ...announcement, id: 2, region: "전국" },
+    { ...announcement, id: 3, region: null },
+  ]);
+
+  assert.deepEqual(
+    filterNationwideRecommendations(recommendations, "seoul", true).map(
+      ({ announcement: item }) => item.id,
+    ),
+    [1, 2, 3],
+  );
+  assert.deepEqual(
+    filterNationwideRecommendations(recommendations, "seoul", false).map(
+      ({ announcement: item }) => item.id,
+    ),
+    [1, 3],
+  );
+});
+
+test("nationwide users keep all matched regions and do not need the filter", () => {
+  const nationwideCondition = { ...condition, region: "nationwide" };
+  const recommendations = matchRecommendations(nationwideCondition, [
+    { ...announcement, id: 1, region: "서울" },
+    { ...announcement, id: 2, region: "전국" },
+    { ...announcement, id: 3, region: "부산" },
+  ]);
+
+  assert.equal(isNationwideUserRegion("nationwide"), true);
+  assert.equal(isNationwideUserRegion("전국"), true);
+  assert.deepEqual(
+    filterNationwideRecommendations(recommendations, "nationwide", false).map(
+      ({ announcement: item }) => item.id,
+    ),
+    [1, 2, 3],
+  );
+});
+
+test("applies the same nationwide filter to later pages and preserves unknown regions", () => {
+  const firstPage = matchRecommendations(condition, [
+    { ...announcement, id: 1, region: "서울" },
+    { ...announcement, id: 2, region: "전국" },
+  ]);
+  const secondPage = matchRecommendations(condition, [
+    { ...announcement, id: 3, region: null },
+    { ...announcement, id: 4, region: "nationwide" },
+  ]);
+
+  const ids = [...firstPage, ...secondPage].flatMap((item) =>
+    filterNationwideRecommendations([item], condition.region, false).map(
+      ({ announcement: filtered }) => filtered.id,
+    ),
+  );
+  assert.deepEqual(ids, [1, 3]);
 });

@@ -15,9 +15,12 @@ import {
 import { fetchOpenAnnouncements } from "@/lib/mobile/open-announcements-client";
 import type { OpenAnnouncementsSort } from "@/lib/mobile/open-announcements";
 import {
+  filterNationwideRecommendations,
+  isNationwideUserRegion,
   matchRecommendations,
   type RecommendationResult,
 } from "@/lib/mobile/recommendations";
+import { announcementSourceLabel } from "@/lib/mobile/announcement-source";
 
 type State = "loading" | "browser" | "outdated" | "ready" | "error" | "no-condition";
 
@@ -29,6 +32,7 @@ export default function AppRecommendationsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sort, setSort] = useState<OpenAnnouncementsSort>("latest");
+  const [includeNationwide, setIncludeNationwide] = useState(true);
 
   const load = useCallback(async () => {
     const availability = getRecommendationsBridgeAvailability();
@@ -45,14 +49,20 @@ export default function AppRecommendationsPage() {
       }
       const nextPage = await fetchOpenAnnouncements(1, sort);
       setCondition(conditionResult.data);
-      setItems(matchRecommendations(conditionResult.data, nextPage.data));
+      setItems(
+        filterNationwideRecommendations(
+          matchRecommendations(conditionResult.data, nextPage.data),
+          conditionResult.data.region,
+          includeNationwide,
+        ),
+      );
       setPage(nextPage.pagination.page);
       setHasMore(nextPage.pagination.has_more);
       setState("ready");
     } catch {
       setState("error");
     }
-  }, [sort]);
+  }, [includeNationwide, sort]);
 
   useEffect(() => {
     void load();
@@ -63,7 +73,11 @@ export default function AppRecommendationsPage() {
     setLoadingMore(true);
     try {
       const nextPage = await fetchOpenAnnouncements(page + 1, sort);
-      const nextRecommendations = matchRecommendations(condition, nextPage.data);
+      const nextRecommendations = filterNationwideRecommendations(
+        matchRecommendations(condition, nextPage.data),
+        condition.region,
+        includeNationwide,
+      );
       setItems((current) => [
         ...current,
         ...nextRecommendations.filter(
@@ -95,19 +109,41 @@ export default function AppRecommendationsPage() {
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-end gap-2">
-        <label htmlFor="recommendation-sort" className="text-xs font-semibold text-subtle">
-          정렬
-        </label>
-        <select
-          id="recommendation-sort"
-          value={sort}
-          onChange={(event) => setSort(event.target.value as OpenAnnouncementsSort)}
-          className="h-10 rounded-md border border-line bg-white px-3 text-xs font-semibold text-ink focus:border-primary"
-        >
-          <option value="latest">등록일 최신순</option>
-          <option value="deadline">마감 임박순</option>
-        </select>
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+        {condition && !isNationwideUserRegion(condition.region) && (
+          <div
+            role="group"
+            aria-label="전국 공고 표시"
+            className="grid min-w-[14rem] flex-1 grid-cols-2 rounded-md border border-line bg-white p-1"
+          >
+            <NationwideFilterButton
+              active={includeNationwide}
+              onClick={() => setIncludeNationwide(true)}
+            >
+              전국 공고 포함
+            </NationwideFilterButton>
+            <NationwideFilterButton
+              active={!includeNationwide}
+              onClick={() => setIncludeNationwide(false)}
+            >
+              전국 공고 제외
+            </NationwideFilterButton>
+          </div>
+        )}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <label htmlFor="recommendation-sort" className="text-xs font-semibold text-subtle">
+            정렬
+          </label>
+          <select
+            id="recommendation-sort"
+            value={sort}
+            onChange={(event) => setSort(event.target.value as OpenAnnouncementsSort)}
+            className="h-10 rounded-md border border-line bg-white px-3 text-xs font-semibold text-ink focus:border-primary"
+          >
+            <option value="latest">등록일 최신순</option>
+            <option value="deadline">마감 임박순</option>
+          </select>
+        </div>
       </div>
       {items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line bg-white px-5 py-10 text-center">
@@ -130,6 +166,11 @@ export default function AppRecommendationsPage() {
                   applyEnd={announcement.apply_end}
                   status={announcement.status}
                 />
+              </div>
+              <div className="mt-2">
+                <span className="inline-flex rounded-badge bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                  출처: {announcementSourceLabel(announcement.source)}
+                </span>
               </div>
               <p className="mt-2 text-xs text-subtle">기관: {announcement.agency ?? "정보 없음"}</p>
               <p className="mt-1 text-xs text-subtle">지역: {announcement.region ?? "확인 필요"}</p>
@@ -185,6 +226,29 @@ export default function AppRecommendationsPage() {
         </button>
       )}
     </div>
+  );
+}
+
+function NationwideFilterButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`h-10 rounded px-2 text-xs font-semibold transition-colors ${
+        active ? "bg-primary text-white" : "bg-white text-subtle"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

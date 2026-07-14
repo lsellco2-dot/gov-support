@@ -14,6 +14,7 @@ export const INTEREST_CATEGORY_IDS: Record<string, number> = {
 
 export interface OpenAnnouncement {
   id: number;
+  source?: string | null;
   title: string;
   agency: string | null;
   category_ids: number[];
@@ -79,6 +80,28 @@ export function matchRecommendations(
     const result = evaluateRecommendation(condition, announcement);
     return result ? [result] : [];
   });
+}
+
+export function filterNationwideRecommendations(
+  recommendations: RecommendationResult[],
+  userRegion: string,
+  includeNationwide: boolean,
+) {
+  if (includeNationwide || isNationwideUserRegion(userRegion)) return recommendations;
+  return recommendations.filter(
+    ({ announcement }) => !isNationwideRegion(announcement.region),
+  );
+}
+
+export function isNationwideUserRegion(region: string) {
+  const value = region.trim().toLowerCase();
+  return value === "nationwide" || value === "전국";
+}
+
+function isNationwideRegion(region: string | null) {
+  if (!region?.trim()) return false;
+  const value = region.trim().toLowerCase();
+  return value === "nationwide" || value.includes("전국");
 }
 
 function matchRegion(userRegion: string, announcementRegion: string | null): FieldMatch {

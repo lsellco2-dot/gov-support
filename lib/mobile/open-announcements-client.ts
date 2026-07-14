@@ -17,7 +17,7 @@ export async function fetchOpenAnnouncements(
   sort: OpenAnnouncementsSort = "latest",
   limit = 50,
 ): Promise<OpenAnnouncementsPage> {
-  const query = new URLSearchParams({ page: String(page), limit: String(limit), sort });
+  const query = buildOpenAnnouncementsQuery(page, sort, limit);
   const response = await fetch(`/api/mobile/open-announcements?${query}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },
@@ -27,6 +27,14 @@ export async function fetchOpenAnnouncements(
     throw new Error("OPEN_ANNOUNCEMENTS_UNAVAILABLE");
   }
   return payload;
+}
+
+export function buildOpenAnnouncementsQuery(
+  page: number,
+  sort: OpenAnnouncementsSort,
+  limit: number,
+) {
+  return new URLSearchParams({ page: String(page), limit: String(limit), sort });
 }
 
 function isOpenAnnouncementsPage(value: unknown): value is OpenAnnouncementsPage {
@@ -42,6 +50,7 @@ function isOpenAnnouncementsPage(value: unknown): value is OpenAnnouncementsPage
 function isOpenAnnouncement(value: unknown): value is OpenAnnouncement {
   return isRecord(value) &&
     Number.isSafeInteger(value.id) &&
+    (value.source === undefined || value.source === null || typeof value.source === "string") &&
     typeof value.title === "string" &&
     Array.isArray(value.category_ids) &&
     value.status === "open" &&

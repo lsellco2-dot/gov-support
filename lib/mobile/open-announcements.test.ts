@@ -4,6 +4,7 @@ import {
   buildOpenAnnouncementsPayload,
   parseOpenAnnouncementsParams,
 } from "./open-announcements";
+import { buildOpenAnnouncementsQuery } from "./open-announcements-client";
 
 test("open announcements uses page 1 and limit 50 by default", () => {
   const parsed = parseOpenAnnouncementsParams(new URLSearchParams());
@@ -28,6 +29,17 @@ test("open announcements supports deadline sort and defaults invalid values to l
   const invalid = parseOpenAnnouncementsParams(new URLSearchParams("sort=random"));
   assert.equal(invalid.ok, true);
   if (invalid.ok) assert.equal(invalid.value.sort, "latest");
+});
+
+test("later page requests preserve the selected sort", () => {
+  assert.equal(
+    buildOpenAnnouncementsQuery(2, "latest", 50).toString(),
+    "page=2&limit=50&sort=latest",
+  );
+  assert.equal(
+    buildOpenAnnouncementsQuery(3, "deadline", 50).toString(),
+    "page=3&limit=50&sort=deadline",
+  );
 });
 
 test("open announcements exposes only public fields and internal detail URL", () => {
@@ -55,6 +67,7 @@ test("open announcements exposes only public fields and internal detail URL", ()
 
   assert.equal(payload.data[0].detail_url, "https://gov-support-nine.vercel.app/app/announcements/10");
   assert.equal(payload.data[0].original_url, "https://source.example/10");
+  assert.equal(payload.data[0].source, "kstartup");
   assert.equal("summary" in payload.data[0], false);
   assert.equal("raw_json" in payload.data[0], false);
   assert.equal(payload.pagination.has_more, true);
