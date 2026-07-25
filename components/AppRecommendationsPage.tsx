@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { LoaderCircle, RefreshCw, Sparkles } from "lucide-react";
+import { LoaderCircle, RefreshCw, Settings, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { useEffect } from "react";
 import CategoryChips from "./CategoryChips";
 import FavoriteButton from "./FavoriteButton";
 import CardApplicationDates from "./CardApplicationDates";
 import {
-  getRecommendationsBridgeAvailability,
-  getUserCondition,
-  type NativeUserCondition,
+  getUserConditionSettingsBridgeAvailability,
+  openUserConditionSettings,
 } from "@/lib/mobile/app-bridge";
 import type { OpenAnnouncementsSort } from "@/lib/mobile/open-announcements";
 import {
@@ -20,16 +20,36 @@ import {
 import { announcementSourceLabel } from "@/lib/mobile/announcement-source";
 import { loadRecommendationBatch } from "@/lib/mobile/recommendation-pages";
 import {
+  resolveUserCondition,
+  type UserConditionSource,
+} from "@/lib/mobile/user-condition-source";
+import {
+  USER_CONDITION_CHANGED_EVENT,
+  type UserCondition,
+} from "@/lib/mobile/user-condition";
+import {
   YouthPolicyChips,
   YouthPolicyRegion,
 } from "./AnnouncementPolicyMeta";
 import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
 
-type State = "loading" | "browser" | "outdated" | "ready" | "error" | "no-condition";
+type State = "loading" | "outdated" | "ready" | "error" | "no-condition";
 
-export default function AppRecommendationsPage() {
+export default function AppRecommendationsPage({
+  detailBasePath = "/app/announcements",
+  settingsPath = "/recommendations/settings",
+  showFavorites = false,
+  notice = null,
+}: {
+  detailBasePath?: "/announcements" | "/app/announcements";
+  settingsPath?: string;
+  showFavorites?: boolean;
+  notice?: string | null;
+}) {
+  const router = useRouter();
   const [state, setState] = useState<State>("loading");
-  const [condition, setCondition] = useState<NativeUserCondition | null>(null);
+  const [condition, setCondition] = useState<UserCondition | null>(null);
+  const [conditionSource, setConditionSource] = useState<UserConditionSource>("web");
   const [items, setItems] = useState<RecommendationResult[]>([]);
   const [page, setPage] = useState(1);
   const [pendingItems, setPendingItems] = useState<RecommendationResult[]>([]);
@@ -37,23 +57,31 @@ export default function AppRecommendationsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [sort, setSort] = useState<OpenAnnouncementsSort>("latest");
   const [includeNationwide, setIncludeNationwide] = useState(true);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
-    const availability = getRecommendationsBridgeAvailability();
-    if (availability !== "available") {
-      setState(availability);
-      return;
-    }
     setState("loading");
     try {
-      const conditionResult = await getUserCondition();
+      const resolution = await resolveUserCondition();
       if (signal?.aborted) return;
-      if (!conditionResult.success || !conditionResult.data.onboarding_completed) {
-        setState(conditionResult.success ? "no-condition" : "error");
+      if (resolution.status !== "ready") {
+        if ("source" in resolution && resolution.source === "web") {
+          setConditionSource("web");
+        } else {
+          setConditionSource("native");
+        }
+        setState(
+          resolution.status === "missing"
+            ? "no-condition"
+            : resolution.status === "outdated"
+              ? "outdated"
+              : "error",
+        );
         return;
       }
+      setConditionSource(resolution.source);
       const batch = await loadRecommendationBatch({
-        condition: conditionResult.data,
+        condition: resolution.condition,
         sort,
         includeNationwide,
         currentPage: 0,
@@ -61,7 +89,7 @@ export default function AppRecommendationsPage() {
         signal,
       });
       if (signal?.aborted) return;
-      setCondition(conditionResult.data);
+      setCondition(resolution.condition);
       setItems(batch.items);
       setPendingItems(batch.pending);
       setPage(batch.lastPage);
@@ -77,6 +105,16 @@ export default function AppRecommendationsPage() {
     const controller = new AbortController();
     void load(controller.signal);
     return () => controller.abort();
+  }, [load]);
+
+  useEffect(() => {
+    const reload = () => void load();
+    window.addEventListener("focus", reload);
+    window.addEventListener(USER_CONDITION_CHANGED_EVENT, reload);
+    return () => {
+      window.removeEventListener("focus", reload);
+      window.removeEventListener(USER_CONDITION_CHANGED_EVENT, reload);
+    };
   }, [load]);
 
   async function loadMore() {
@@ -110,15 +148,33 @@ export default function AppRecommendationsPage() {
 
   const hasMore = pendingItems.length > 0 || hasMoreCandidates;
 
-  if (state === "loading") return <Status icon="loading" text="AI추천 공고를 불러오는 중입니다." />;
-  if (state === "browser") {
-    return <Status icon="sparkles" text="즐겨찾기와 AI추천은 정부지원AI비서 앱에서 사용할 수 있습니다." />;
+  async function openSettings() {
+    setSettingsMessage(null);
+    if (
+      conditionSource === "native" ||
+      getUserConditionSettingsBridgeAvailability() === "available"
+    ) {
+      const result = await openUserConditionSettings();
+      if (!result.success) {
+        setSettingsMessage("앱의 내 정보 설정 화면을 열지 못했습니다.");
+      }
+      return;
+    }
+    router.push(settingsPath);
   }
+
+  if (state === "loading") return <Status icon="loading" text="AI추천 공고를 불러오는 중입니다." />;
   if (state === "outdated") {
     return <Status icon="sparkles" text="정부지원AI비서 앱을 최신 버전으로 업데이트하면 사용할 수 있습니다." />;
   }
   if (state === "no-condition") {
-    return <Status icon="sparkles" text="AI추천을 사용하려면 앱에서 내 정보를 먼저 설정해 주세요." />;
+    return (
+      <ConditionPrompt
+        native={conditionSource === "native"}
+        onOpenSettings={openSettings}
+        message={settingsMessage}
+      />
+    );
   }
   if (state === "error") {
     return <Status icon="refresh" text="AI추천 공고를 불러오지 못했습니다." retry={load} />;
@@ -126,7 +182,28 @@ export default function AppRecommendationsPage() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+      {notice && (
+        <p
+          className="mb-3 rounded-md border border-open bg-green-50 px-3 py-2 text-sm font-semibold text-open"
+          role="status"
+        >
+          {notice}
+        </p>
+      )}
+      {settingsMessage && (
+        <p className="mb-3 text-sm text-urgent" role="alert">
+          {settingsMessage}
+        </p>
+      )}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void openSettings()}
+          className="flex h-10 items-center justify-center rounded-md border border-line bg-white px-3 text-xs font-semibold text-primary"
+        >
+          <Settings className="mr-1.5" size={16} aria-hidden="true" />
+          내 정보 수정
+        </button>
         {condition && !isNationwideUserRegion(condition.region) && (
           <div
             role="group"
@@ -224,25 +301,27 @@ export default function AppRecommendationsPage() {
                 )}
               </div>
               <Link
-                href={`/app/announcements/${announcement.id}`}
+                href={`${detailBasePath}/${announcement.id}`}
                 className="mt-3 flex h-11 items-center justify-center rounded-md border border-primary text-xs font-semibold text-primary"
               >
                 상세보기
               </Link>
-              <FavoriteButton
-                compact
-                announcement={{
-                  id: announcement.id,
-                  title: announcement.title,
-                  agency: announcement.agency,
-                  category_ids: announcement.category_ids,
-                  region: announcement.region,
-                  status: announcement.status,
-                  apply_end: announcement.apply_end,
-                  detail_url: announcement.detail_url,
-                  original_url: announcement.original_url,
-                }}
-              />
+              {showFavorites && (
+                <FavoriteButton
+                  compact
+                  announcement={{
+                    id: announcement.id,
+                    title: announcement.title,
+                    agency: announcement.agency,
+                    category_ids: announcement.category_ids,
+                    region: announcement.region,
+                    status: announcement.status,
+                    apply_end: announcement.apply_end,
+                    detail_url: announcement.detail_url,
+                    original_url: announcement.original_url,
+                  }}
+                />
+              )}
             </article>
           ))}
         </div>
@@ -257,6 +336,40 @@ export default function AppRecommendationsPage() {
           {loadingMore && <LoaderCircle className="mr-2 animate-spin" size={18} aria-hidden="true" />}
           {loadingMore ? "불러오는 중" : "추천 공고 더 보기"}
         </button>
+      )}
+    </div>
+  );
+}
+
+function ConditionPrompt({
+  native,
+  onOpenSettings,
+  message,
+}: {
+  native: boolean;
+  onOpenSettings: () => Promise<void>;
+  message: string | null;
+}) {
+  return (
+    <div className="rounded-lg border border-line bg-white px-5 py-10 text-center">
+      <Sparkles className="mx-auto text-primary" size={30} aria-hidden="true" />
+      <h2 className="mt-3 text-base font-bold text-ink">
+        내 정보를 설정하고 맞춤 공고를 확인하세요
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-subtle">
+        사용자 유형, 지역, 관심 분야를 기준으로 신청 가능성이 높은 공고를 추천합니다.
+      </p>
+      <button
+        type="button"
+        onClick={() => void onOpenSettings()}
+        className="mt-5 h-12 rounded-md bg-primary px-6 text-sm font-semibold text-white"
+      >
+        {native ? "앱에서 내 정보 설정" : "내 정보 설정"}
+      </button>
+      {message && (
+        <p className="mt-3 text-sm text-urgent" role="alert">
+          {message}
+        </p>
       )}
     </div>
   );

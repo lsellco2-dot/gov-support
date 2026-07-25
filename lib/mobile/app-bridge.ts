@@ -1,3 +1,8 @@
+import {
+  normalizeUserCondition,
+  type UserCondition,
+} from "./user-condition";
+
 export const APP_BRIDGE_NAME = "GovSupportApp" as const;
 export const FAVORITES_CHANGED_EVENT = "govsupport:favorites-changed" as const;
 
@@ -27,15 +32,7 @@ export interface NativeFavoriteAnnouncement {
   favorited_at: number;
 }
 
-export interface NativeUserCondition {
-  user_type: string;
-  region: string;
-  industry: string;
-  interests: string[];
-  startup_years: string;
-  onboarding_completed: boolean;
-  schema_version: number;
-}
+export type NativeUserCondition = UserCondition;
 
 export interface FavoriteSnapshot {
   id: number;
@@ -264,30 +261,6 @@ function normalizeFavorite(value: unknown): NativeFavoriteAnnouncement | null {
     detail_url: detailUrl,
     original_url: nullableString(value.original_url),
     favorited_at: Number.isFinite(Number(value.favorited_at)) ? Number(value.favorited_at) : 0,
-  };
-}
-
-function normalizeUserCondition(value: unknown): NativeUserCondition | null {
-  if (!isRecord(value)) return null;
-  if (
-    typeof value.user_type !== "string" ||
-    typeof value.region !== "string" ||
-    typeof value.industry !== "string" ||
-    !Array.isArray(value.interests) ||
-    typeof value.startup_years !== "string" ||
-    typeof value.onboarding_completed !== "boolean" ||
-    !Number.isInteger(value.schema_version)
-  ) {
-    return null;
-  }
-  return {
-    user_type: value.user_type,
-    region: value.region,
-    industry: value.industry,
-    interests: value.interests.filter((item): item is string => typeof item === "string"),
-    startup_years: value.startup_years,
-    onboarding_completed: value.onboarding_completed,
-    schema_version: Number(value.schema_version),
   };
 }
 

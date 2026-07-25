@@ -1,4 +1,5 @@
 import AudienceEntryCards from "@/components/AudienceEntryCards";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,12 @@ export default function HomePage() {
         <p className="mt-3 text-sm leading-relaxed text-subtle sm:text-base">
           나에게 맞는 맞춤 공고를 설정하세요.
         </p>
+        <Link
+          href="/recommendations"
+          className="mt-6 inline-flex h-12 items-center justify-center rounded-md bg-primary px-6 text-sm font-semibold text-white hover:bg-primary-dark"
+        >
+          AI추천 시작하기
+        </Link>
       </section>
 
       <section className="mt-10">
