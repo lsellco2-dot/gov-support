@@ -63,6 +63,7 @@ export interface YouthCenterStoreResult {
   closedUpdated: number;
   closedWithoutEndDate: number;
   absentExistingRowsUntouched: number;
+  writeRequests: number;
 }
 
 export function buildYouthCenterSyncPlan(
@@ -330,8 +331,10 @@ export async function storeYouthCenterPlan(
   plan: YouthCenterSyncPlan,
 ): Promise<YouthCenterStoreResult> {
   let activeUpserted = 0;
+  let writeRequests = 0;
   for (let index = 0; index < plan.activeUpserts.length; index += UPSERT_CHUNK_SIZE) {
     const chunk = plan.activeUpserts.slice(index, index + UPSERT_CHUNK_SIZE);
+    writeRequests++;
     const { error } = await supabaseAdmin
       .from("announcements")
       .upsert(chunk, { onConflict: "source_id,source_key" });
@@ -343,6 +346,7 @@ export async function storeYouthCenterPlan(
 
   let closedUpdated = 0;
   for (const update of plan.closedUpdates) {
+    writeRequests++;
     const { data, error } = await supabaseAdmin
       .from("announcements")
       .update(update.values)
@@ -355,6 +359,7 @@ export async function storeYouthCenterPlan(
     closedUpdated += data?.length ?? 0;
   }
 
+  writeRequests++;
   const { error: fetchedAtError } = await supabaseAdmin
     .from("sources")
     .update({ last_fetched_at: new Date().toISOString() })
@@ -371,6 +376,7 @@ export async function storeYouthCenterPlan(
     closedUpdated,
     closedWithoutEndDate: plan.closedWithoutEndDate.length,
     absentExistingRowsUntouched: plan.absentExistingRowsUntouched,
+    writeRequests,
   };
 }
 

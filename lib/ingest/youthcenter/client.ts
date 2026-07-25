@@ -22,18 +22,27 @@ interface ParsedXmlPage {
 
 class LegacyEndpointUnavailableError extends Error {}
 
+export interface YouthCenterClientOptions {
+  fetchImpl?: typeof fetch;
+  waitBeforeRetry?: (attempt: number) => Promise<void>;
+}
+
 export async function fetchAllYouthCenterPolicies(
   apiKey = process.env.YOUTHCENTER_API_KEY,
+  options: YouthCenterClientOptions = {},
 ): Promise<YouthCenterFetchResult> {
   const key = requireYouthCenterApiKey(apiKey);
+  const metrics = { requestCount: 0 };
 
   try {
-    return await fetchVariant("legacy", key);
+    const result = await fetchVariant("legacy", key, metrics, options);
+    return { ...result, requestCount: metrics.requestCount };
   } catch (error) {
-    // 2026년 현재 공식 문서에는 새 엔드포인트도 안내된다. 구형 주소가 8080으로
-    // 리디렉션되어 사용할 수 없을 때만 같은 키로 새 XML API를 시도한다.
+    // 구형 주소가 리디렉션되거나 종료 상태(400/404/405/410)를 반환할 때만
+    // 같은 키로 현재 XML API를 시도한다.
     if (!(error instanceof LegacyEndpointUnavailableError)) throw error;
-    return fetchVariant("current", key);
+    const result = await fetchVariant("current", key, metrics, options);
+    return { ...result, requestCount: metrics.requestCount };
   }
 }
 
@@ -50,6 +59,8 @@ export function requireYouthCenterApiKey(value: string | undefined) {
 async function fetchVariant(
   variant: ApiVariant,
   apiKey: string,
+  metrics: { requestCount: number },
+  options: YouthCenterClientOptions,
 ): Promise<YouthCenterFetchResult> {
   const records: YouthCenterRawRecord[] = [];
   const fingerprints = new Set<string>();
@@ -57,7 +68,13 @@ async function fetchVariant(
   let pagesFetched = 0;
 
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const parsed = await fetchXmlPage(variant, apiKey, page);
+    const parsed = await fetchXmlPage(
+      variant,
+      apiKey,
+      page,
+      metrics,
+      options,
+    );
     pagesFetched++;
     if (parsed.total !== null) reportedTotal = parsed.total;
     if (parsed.records.length === 0) break;
@@ -79,32 +96,39 @@ async function fetchVariant(
     throw new Error("온통청년 API 페이지 안전 한도에 도달했습니다.");
   }
 
-  return { apiVariant: variant, records, pagesFetched, reportedTotal };
+  return {
+    apiVariant: variant,
+    records,
+    pagesFetched,
+    reportedTotal,
+    requestCount: metrics.requestCount,
+  };
 }
 
 async function fetchXmlPage(
   variant: ApiVariant,
   apiKey: string,
   page: number,
+  metrics: { requestCount: number },
+  options: YouthCenterClientOptions,
 ): Promise<ParsedXmlPage> {
   const url = buildPageUrl(variant, apiKey, page);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const waitBeforeRetry = options.waitBeforeRetry ?? retryDelay;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(url, {
+      metrics.requestCount++;
+      const response = await fetchImpl(url, {
         cache: "no-store",
         redirect: "manual",
         headers: { Accept: "application/xml,text/xml;q=0.9,*/*;q=0.1" },
         signal: controller.signal,
       });
 
-      if (
-        variant === "legacy" &&
-        response.status >= 300 &&
-        response.status < 400
-      ) {
+      if (variant === "legacy" && legacyEndpointUnavailable(response.status)) {
         throw new LegacyEndpointUnavailableError(
           "구형 온통청년 API 주소를 사용할 수 없습니다.",
         );
@@ -112,7 +136,7 @@ async function fetchXmlPage(
 
       if (response.status === 429 || response.status >= 500) {
         if (attempt < MAX_ATTEMPTS) {
-          await retryDelay(attempt);
+          await waitBeforeRetry(attempt);
           continue;
         }
       }
@@ -137,13 +161,23 @@ async function fetchXmlPage(
             : "온통청년 API 네트워크 요청에 실패했습니다.",
         );
       }
-      await retryDelay(attempt);
+      await waitBeforeRetry(attempt);
     } finally {
       clearTimeout(timeout);
     }
   }
 
   throw new Error("온통청년 API 요청에 실패했습니다.");
+}
+
+function legacyEndpointUnavailable(status: number) {
+  return (
+    (status >= 300 && status < 400) ||
+    status === 400 ||
+    status === 404 ||
+    status === 405 ||
+    status === 410
+  );
 }
 
 function buildPageUrl(variant: ApiVariant, apiKey: string, page: number) {

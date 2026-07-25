@@ -67,6 +67,7 @@ export interface YouthCenterFetchResult {
   records: YouthCenterRawRecord[];
   pagesFetched: number;
   reportedTotal: number | null;
+  requestCount: number;
 }
 
 export interface ExistingAnnouncementForDedup {

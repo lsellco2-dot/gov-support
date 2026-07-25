@@ -1,25 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/ingest/cron-auth";
 import { purgeExpiredAnnouncements, runIngest } from "@/lib/ingest/run";
 
-export const maxDuration = 300; // Vercel Pro 기준. Hobby면 소스별 분할 호출 권장
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const auth = req.headers.get("authorization");
-  return auth === `Bearer ${secret}`;
-}
-
 async function handle(req: NextRequest) {
-  if (!authorized(req)) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "인증되지 않은 요청입니다." }, { status: 401 });
   }
   try {
     const source = req.nextUrl.searchParams.get("source"); // ?source=bizinfo
     const results = await runIngest(source ? source.split(",") : undefined);
     const cleanup = await purgeExpiredAnnouncements();
-    return NextResponse.json({ ok: !cleanup.error, results, cleanup });
+    const ok =
+      !cleanup.error &&
+      results.every((result) => !result.error && result.failed === 0);
+    return NextResponse.json(
+      { ok, results, cleanup },
+      { status: ok ? 200 : 500 },
+    );
   } catch (error) {
     console.error("ingest 실행 실패:", error instanceof Error ? error.message : "unknown error");
     return NextResponse.json(
