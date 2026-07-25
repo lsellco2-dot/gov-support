@@ -13,6 +13,64 @@ create table if not exists sources (
   last_fetched_at timestamptz
 );
 
+create or replace function public.ensure_source_by_code(
+  p_code text,
+  p_name text
+)
+returns smallint
+language plpgsql
+security invoker
+set search_path = ''
+as $function$
+declare
+  v_source_id smallint;
+  v_next_id integer;
+begin
+  if nullif(pg_catalog.btrim(p_code), '') is null
+     or nullif(pg_catalog.btrim(p_name), '') is null then
+    raise exception 'source code and name are required'
+      using errcode = '22023';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('public.sources.id-allocation', 0)
+  );
+
+  select s.id into v_source_id
+  from public.sources s
+  where s.code = p_code;
+
+  if v_source_id is null then
+    select coalesce(pg_catalog.max(s.id), 0) + 1
+      into v_next_id
+    from public.sources s;
+
+    if v_next_id > 32767 then
+      raise exception 'sources.id smallint range exhausted';
+    end if;
+
+    insert into public.sources (id, code, name)
+    values (v_next_id::smallint, p_code, p_name)
+    on conflict (code) do nothing;
+
+    select s.id into v_source_id
+    from public.sources s
+    where s.code = p_code;
+  end if;
+
+  if v_source_id is null then
+    raise exception 'source creation failed for code %', p_code;
+  end if;
+
+  return v_source_id;
+end;
+$function$;
+
+revoke all on function public.ensure_source_by_code(text, text)
+  from public, anon, authenticated;
+grant execute on function public.ensure_source_by_code(text, text)
+  to service_role;
+
 insert into sources (id, code, name) values
  (1,'bizinfo','중소벤처기업부 중소기업 지원사업(기업마당)'),
  (2,'kstartup','창업진흥원 K-Startup'),
@@ -20,6 +78,8 @@ insert into sources (id, code, name) values
  (4,'mois','행정안전부 공공서비스(혜택)'),
  (5,'msit','과학기술정보통신부 사업공고')
 on conflict (id) do nothing;
+
+select public.ensure_source_by_code('youthcenter', '온통청년');
 
 -- 카테고리 (9개 대분류)
 create table if not exists categories (
@@ -45,11 +105,21 @@ create table if not exists announcements (
   organization text,
   category_ids smallint[] not null default '{}',
   region text default '전국',
+  regions text[],
   target text,
   support_type text,
   summary text,
   apply_start date,
   apply_end date,                -- null = 상시/미상
+  age_min integer,
+  age_max integer,
+  policy_domain text,
+  source_updated_at timestamptz,
+  source_status text
+    check (
+      source_status in ('open', 'upcoming', 'always', 'closed', 'unknown')
+    ),
+  source_fingerprint text,
   detail_url text,
   detail_content text,
   apply_method text,
@@ -72,6 +142,11 @@ create table if not exists announcements (
 
 create index if not exists idx_ann_end on announcements (apply_end desc nulls last);
 create index if not exists idx_ann_category on announcements using gin (category_ids);
+create index if not exists idx_ann_regions on announcements using gin (regions);
+create index if not exists idx_ann_policy_domain on announcements (policy_domain);
+create index if not exists idx_ann_source_fingerprint
+  on announcements (source_id, source_fingerprint)
+  where source_fingerprint is not null;
 create index if not exists idx_ann_hash on announcements (content_hash);
 create index if not exists idx_ann_title_trgm on announcements using gin (title gin_trgm_ops);
 create index if not exists idx_ann_detail_status
@@ -83,26 +158,69 @@ create index if not exists idx_ann_detail_status
 -- source_id 오름차순 = bizinfo > kstartup > ... 우선
 create or replace view announcements_public
 with (security_invoker = true) as
-with ranked_by_hash as (
+with base as (
   select
     a.*,
+    s.code as source_code,
     regexp_replace(lower(a.title), '[^0-9a-z가-힣]', '', 'g') as canonical_title,
     row_number() over (
       partition by a.content_hash
       order by a.source_id asc, a.updated_at desc, a.id desc
-    ) as content_rank
+    ) as content_rank,
+    row_number() over (
+      partition by
+        case
+          when s.code = 'youthcenter'
+               and a.source_fingerprint is not null
+            then a.source_id::text || ':' || a.source_fingerprint
+          else 'id:' || a.id::text
+        end
+      order by a.updated_at desc, a.id desc
+    ) as source_fingerprint_rank
   from announcements a
+  join sources s on s.id = a.source_id
 ),
 source_deduped as (
-  select *
-  from ranked_by_hash
-  where content_rank = 1
+  select current_row.*
+  from base current_row
+  where
+    (
+      current_row.source_code <> 'youthcenter'
+      and current_row.content_rank = 1
+    )
+    or
+    (
+      current_row.source_code = 'youthcenter'
+      and (
+        current_row.source_fingerprint is null
+        or current_row.source_fingerprint_rank = 1
+      )
+      and not exists (
+        select 1
+        from base preferred_hash
+        where preferred_hash.content_hash = current_row.content_hash
+          and preferred_hash.source_id < current_row.source_id
+      )
+    )
 )
 select
   id, source_id, source_key, title, organization, category_ids, region,
   target, support_type, summary, apply_start, apply_end, detail_url,
-  case when apply_end is null or apply_end >= current_date
-       then 'open' else 'closed' end as status,
+  case
+    when current_row.source_code = 'youthcenter'
+         and current_row.source_status = 'closed'
+      then 'closed'
+    when current_row.source_code = 'youthcenter'
+         and current_row.source_status = 'upcoming'
+      then 'upcoming'
+    when current_row.source_code = 'youthcenter'
+         and current_row.source_status in ('open', 'always')
+      then 'open'
+    when current_row.apply_end is null
+         or current_row.apply_end >= current_date
+      then 'open'
+    else 'closed'
+  end as status,
   content_hash, created_at, updated_at
 from source_deduped current_row
 where not exists (

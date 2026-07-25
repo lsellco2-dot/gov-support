@@ -2,6 +2,7 @@ import { supabaseAnon } from "@/lib/supabase/anon";
 import { FIXTURES } from "./fixtures";
 import { sanitizeDisplayRow, sanitizeDisplayText } from "@/lib/text/sanitize";
 import { normalizeMsitAttachmentProxyUrl } from "@/lib/ingest/msit-attachments";
+import { compatibleRegionLabels } from "@/lib/regions";
 
 // Supabase 미연결 상태에서 UI 개발용: fixtures를 메모리에서 검색/필터/정렬/페이지네이션
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
@@ -147,13 +148,22 @@ function listFromFixtures(p: ListParams, page: number, size: number) {
   }
   if (p.recommendationRegion) {
     const { label, includeNationwide } = p.recommendationRegion;
+    const compatibleLabels = compatibleRegionLabels(label);
     rows = rows.filter((r) => {
       const region = r.region?.trim() ?? "";
       if (!region) return includeNationwide;
-      return region === label || (includeNationwide && region === "전국");
+      return (
+        compatibleLabels.includes(region) ||
+        (includeNationwide && region === "전국")
+      );
     });
   } else if (p.region && p.region !== "전국") {
-    rows = rows.filter((r) => r.region === p.region || r.region === "전국");
+    const compatibleLabels = compatibleRegionLabels(p.region);
+    rows = rows.filter(
+      (r) =>
+        (r.region !== null && compatibleLabels.includes(r.region)) ||
+        r.region === "전국",
+    );
   }
 
   if (sort === "latest") {
@@ -210,11 +220,18 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
   }
   if (p.recommendationRegion) {
     const { label, includeNationwide } = p.recommendationRegion;
+    const compatibleLabels = compatibleRegionLabels(label);
     q = includeNationwide
-      ? q.or(`region.eq.${label},region.eq.전국,region.is.null`)
-      : q.eq("region", label);
+      ? q.or(
+          [
+            ...compatibleLabels.map((region) => `region.eq.${region}`),
+            "region.eq.전국",
+            "region.is.null",
+          ].join(","),
+        )
+      : q.in("region", compatibleLabels);
   } else if (p.region && p.region !== "전국") {
-    q = q.in("region", [p.region, "전국"]);
+    q = q.in("region", [...compatibleRegionLabels(p.region), "전국"]);
   }
 
   if (sort === "latest") {

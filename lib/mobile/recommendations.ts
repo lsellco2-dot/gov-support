@@ -1,4 +1,5 @@
 import type { NativeUserCondition } from "./app-bridge";
+import { matchesCompatibleRegion } from "@/lib/regions";
 
 export const INTEREST_CATEGORY_IDS: Record<string, number> = {
   startup_support: 1,
@@ -119,9 +120,13 @@ function matchRegion(userRegion: string, announcementRegion: string | null): Fie
   if (!announcementRegion?.trim()) return "unknown";
   const value = announcementRegion.trim().toLowerCase();
   if (value === "nationwide" || value.includes("전국")) return "match";
-  const expected = REGION_LABELS[userRegion];
+  const expected =
+    REGION_LABELS[userRegion] ??
+    (/[가-힣]/.test(userRegion) ? userRegion.trim() : null);
   if (!expected) return "unknown";
-  return value === userRegion || value.includes(expected) ? "match" : "conflict";
+  return matchesCompatibleRegion(expected, announcementRegion)
+    ? "match"
+    : "conflict";
 }
 
 function matchTarget(userType: string, announcementTarget: string | null): FieldMatch {

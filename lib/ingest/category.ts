@@ -1,5 +1,10 @@
 import type { NormalizedAnnouncement } from "./types";
 
+type CategoryInput = Pick<
+  NormalizedAnnouncement,
+  "title" | "target" | "supportType" | "summary"
+>;
+
 /** 카테고리 id ↔ 키워드 룰. 룰은 여기만 고치면 됨. */
 const RULES: Array<{ id: number; keywords: string[] }> = [
   { id: 1, keywords: ["창업", "예비창업", "스타트업", "초기기업", "창업기업"] },
@@ -14,7 +19,7 @@ const RULES: Array<{ id: number; keywords: string[] }> = [
 ];
 
 /** 제목+대상+지원형태+요약 텍스트에서 다중 카테고리 매핑. 없으면 [] (미분류) */
-export function mapCategories(a: NormalizedAnnouncement): number[] {
+export function mapCategories(a: CategoryInput): number[] {
   const text = [a.title, a.target, a.supportType, a.summary]
     .filter(Boolean)
     .join(" ")
