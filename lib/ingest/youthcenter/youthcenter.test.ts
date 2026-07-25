@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildYouthCenterPolicyDetailUrl } from "@/lib/youthcenter/url";
 import {
   parseYouthCenterXmlPage,
   requireYouthCenterApiKey,
@@ -52,6 +53,19 @@ test("current XML fields are parsed and mapped without exposing credentials", ()
   assert.equal(result.policy?.status, "open");
   assert.equal(result.policy?.sourceStatus, "open");
   assert.equal(result.policy?.included, true);
+  assert.equal(
+    result.policy?.originalUrl,
+    "https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail/R202607250001",
+  );
+});
+
+test("official policy URLs are generated only for safe policy IDs", () => {
+  assert.equal(
+    buildYouthCenterPolicyDetailUrl(" 20260725005400000001 "),
+    "https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail/20260725005400000001",
+  );
+  assert.equal(buildYouthCenterPolicyDetailUrl("../unsafe"), null);
+  assert.equal(buildYouthCenterPolicyDetailUrl(""), null);
 });
 
 test("legacy XML aliases and regional codes are supported", () => {

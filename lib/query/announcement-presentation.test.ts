@@ -76,21 +76,27 @@ test("normalizes safe structured presentation fields", () => {
   );
 });
 
-test("extracts only normalized youth detail fields and blocks unsafe URLs", () => {
-  const fields = youthCenterDetailFields({
-    provider: "youthcenter",
-    original: { openApiVlak: "must-not-leak" },
-    normalized: {
-      managingOrganization: "서울청년센터",
-      incomeCondition: "중위소득 150% 이하",
-      applicationUrl: "https://example.go.kr/apply",
-      originalUrl: "javascript:alert(1)",
+test("extracts only normalized youth detail fields and uses the official source URL", () => {
+  const fields = youthCenterDetailFields(
+    {
+      provider: "youthcenter",
+      original: { openApiVlak: "must-not-leak" },
+      normalized: {
+        managingOrganization: "서울청년센터",
+        incomeCondition: "중위소득 150% 이하",
+        applicationUrl: "https://example.go.kr/apply",
+        originalUrl: "javascript:alert(1)",
+      },
     },
-  });
+    "20260725005400000001",
+  );
   assert.equal(fields.managing_organization, "서울청년센터");
   assert.equal(fields.income_condition, "중위소득 150% 이하");
   assert.equal(fields.application_url, "https://example.go.kr/apply");
-  assert.equal(fields.original_url, null);
+  assert.equal(
+    fields.original_url,
+    "https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail/20260725005400000001",
+  );
   assert.equal("original" in fields, false);
   assert.equal(safeExternalHttpUrl("data:text/plain,test"), null);
 });

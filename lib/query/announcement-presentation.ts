@@ -1,4 +1,5 @@
 import { sanitizeDisplayText } from "@/lib/text/sanitize";
+import { buildYouthCenterPolicyDetailUrl } from "@/lib/youthcenter/url";
 
 export type PolicyDomain =
   | "employment_startup"
@@ -113,6 +114,7 @@ export function normalizePresentationFields(
 
 export function youthCenterDetailFields(
   rawJson: unknown,
+  sourceKey?: string | null,
 ): YouthCenterDetailFields {
   const wrapper = record(rawJson);
   const normalized = record(wrapper?.normalized);
@@ -124,7 +126,9 @@ export function youthCenterDetailFields(
     major_condition: displayString(normalized?.majorCondition),
     specialty_condition: displayString(normalized?.specialtyCondition),
     application_url: safeExternalHttpUrl(normalized?.applicationUrl),
-    original_url: safeExternalHttpUrl(normalized?.originalUrl),
+    original_url:
+      buildYouthCenterPolicyDetailUrl(sourceKey) ??
+      safeExternalHttpUrl(normalized?.originalUrl),
   };
 }
 

@@ -1,4 +1,5 @@
 import { sanitizeDisplayText } from "@/lib/text/sanitize";
+import { buildYouthCenterPolicyDetailUrl } from "@/lib/youthcenter/url";
 import {
   INTEGRATED_GWANGJU_JEONNAM_REGION,
   normalizeIntegratedRegionName,
@@ -284,12 +285,14 @@ export function mapYouthCenterPolicy(
     ["제출 서류", documents],
     ["기타 사항", other],
   ]);
-  const originalUrl = safeUrl(
+  const referenceUrl = safeUrl(
     firstNonEmpty([
       pick(raw, ["refUrlAddr1", "rfcSiteUrla1"]),
       pick(raw, ["refUrlAddr2", "rfcSiteUrla2"]),
     ]),
   );
+  const originalUrl =
+    buildYouthCenterPolicyDetailUrl(sourceExternalId) ?? referenceUrl;
   const applicationUrl = safeUrl(
     pick(raw, ["aplyUrlAddr", "rqutUrla", "applicationUrl"]),
   );
@@ -303,7 +306,7 @@ export function mapYouthCenterPolicy(
     support,
     detailContent,
     applicationUrl,
-    originalUrl,
+    originalUrl: referenceUrl,
     period,
     domain,
     middleCategory,

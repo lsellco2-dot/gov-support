@@ -84,7 +84,7 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
             status: item.status,
             apply_end: item.apply_end,
             detail_url: `/app/announcements/${item.id}`,
-            original_url: item.detail_url,
+            original_url: item.original_url ?? item.detail_url,
           }}
         />
         {isYouthCenter && <YouthCenterPolicyDetails item={item} compact />}

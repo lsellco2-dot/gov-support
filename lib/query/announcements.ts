@@ -481,7 +481,7 @@ function toDetail(
     source,
   );
   const youthFields = isYouthCenterSource(presentation.source_code)
-    ? youthCenterDetailFields(row.raw_json)
+    ? youthCenterDetailFields(row.raw_json, row.source_key)
     : emptyYouthCenterDetailFields();
   const detailContent = cleanText(
     pickRaw(raw, ["pbanc_ctnt", "detail_content", "content", "summary"])
