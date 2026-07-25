@@ -56,7 +56,7 @@ export default function AppRecommendationsPage({
   const [hasMoreCandidates, setHasMoreCandidates] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sort, setSort] = useState<OpenAnnouncementsSort>("latest");
-  const [includeNationwide, setIncludeNationwide] = useState(true);
+  const [includeNationwide, setIncludeNationwide] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -211,16 +211,16 @@ export default function AppRecommendationsPage({
             className="grid min-w-[14rem] flex-1 grid-cols-2 rounded-md border border-line bg-white p-1"
           >
             <NationwideFilterButton
-              active={includeNationwide}
-              onClick={() => setIncludeNationwide(true)}
-            >
-              전국 공고 포함
-            </NationwideFilterButton>
-            <NationwideFilterButton
               active={!includeNationwide}
               onClick={() => setIncludeNationwide(false)}
             >
               전국 공고 제외
+            </NationwideFilterButton>
+            <NationwideFilterButton
+              active={includeNationwide}
+              onClick={() => setIncludeNationwide(true)}
+            >
+              전국 공고 포함
             </NationwideFilterButton>
           </div>
         )}
