@@ -152,6 +152,31 @@ test("an always policy can transition to closed without an end date", () => {
   assert.equal(plan.closedUpdates[0].values.source_status, "closed");
 });
 
+test("daily YouthCenter upserts preserve an already fetched original detail", () => {
+  const plan = buildYouthCenterSyncPlan(
+    [
+      policy({
+        sourceExternalId: "ORIGINAL",
+        detailContent: "API 필드로 만든 짧은 대체 상세",
+      }),
+    ],
+    [
+      {
+        sourceKey: "ORIGINAL",
+        applyStart: null,
+        applyEnd: null,
+        detailContent: "공식 상세 페이지에서 수집한 전체 원문",
+        detailFetchedAt: "2026-07-25T00:00:00.000Z",
+      },
+    ],
+    42,
+  );
+  assert.equal(
+    plan.activeUpserts[0].detail_content,
+    "공식 상세 페이지에서 수집한 전체 원문",
+  );
+});
+
 test("public status uses source status only for youthcenter", () => {
   assert.equal(
     resolvePublicAnnouncementStatus({

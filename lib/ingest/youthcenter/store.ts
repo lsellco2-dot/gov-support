@@ -17,6 +17,8 @@ export interface ExistingYouthCenterAnnouncement {
   sourceKey: string;
   applyStart: string | null;
   applyEnd: string | null;
+  detailContent?: string | null;
+  detailFetchedAt?: string | null;
 }
 
 export interface YouthCenterAnnouncementRow {
@@ -78,7 +80,12 @@ export function buildYouthCenterSyncPlan(
   const fetchedKeys = new Set(policies.map((policy) => policy.sourceExternalId));
   const activeUpserts = policies
     .filter((policy) => policy.included)
-    .map((policy) => toYouthCenterAnnouncementRow(policy, sourceId, now));
+    .map((policy) =>
+      preserveStoredDetail(
+        toYouthCenterAnnouncementRow(policy, sourceId, now),
+        existingByKey.get(policy.sourceExternalId),
+      ),
+    );
   const closedUpdates: YouthCenterClosedUpdate[] = [];
   const closedWithoutEndDate: string[] = [];
 
@@ -94,7 +101,10 @@ export function buildYouthCenterSyncPlan(
       closedWithoutEndDate.push(policy.sourceExternalId);
     }
 
-    const row = toYouthCenterAnnouncementRow(policy, sourceId, now);
+    const row = preserveStoredDetail(
+      toYouthCenterAnnouncementRow(policy, sourceId, now),
+      existingByKey.get(policy.sourceExternalId),
+    );
     const { source_id: _sourceId, source_key: sourceKey, ...values } = row;
     closedUpdates.push({ sourceKey, values });
   }
@@ -265,7 +275,9 @@ export async function loadExistingYouthCenterAnnouncements(sourceId: number) {
   for (let from = 0; ; from += DB_PAGE_SIZE) {
     const { data, error } = await supabaseAdmin
       .from("announcements")
-      .select("source_key,apply_start,apply_end")
+      .select(
+        "source_key,apply_start,apply_end,detail_content,detail_fetched_at",
+      )
       .eq("source_id", sourceId)
       .order("id", { ascending: true })
       .range(from, from + DB_PAGE_SIZE - 1);
@@ -277,11 +289,24 @@ export async function loadExistingYouthCenterAnnouncements(sourceId: number) {
       sourceKey: String(row.source_key),
       applyStart: nullableString(row.apply_start),
       applyEnd: nullableString(row.apply_end),
+      detailContent: nullableString(row.detail_content),
+      detailFetchedAt: nullableString(row.detail_fetched_at),
     }));
     rows.push(...page);
     if (page.length < DB_PAGE_SIZE) break;
   }
   return rows;
+}
+
+function preserveStoredDetail(
+  row: YouthCenterAnnouncementRow,
+  existing: ExistingYouthCenterAnnouncement | undefined,
+) {
+  if (!existing?.detailFetchedAt || !existing.detailContent) return row;
+  return {
+    ...row,
+    detail_content: existing.detailContent,
+  };
 }
 
 export async function loadExistingAnnouncementsForDedup() {

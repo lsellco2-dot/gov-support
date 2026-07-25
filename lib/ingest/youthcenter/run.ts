@@ -1,4 +1,8 @@
 import { fetchAllYouthCenterPolicies } from "./client";
+import {
+  fetchAndStoreYouthCenterDetails,
+  loadYouthCenterDetailCandidates,
+} from "./detail-store";
 import { prepareYouthCenterPolicies } from "./prepare";
 import {
   assertYouthCenterSchemaReady,
@@ -48,6 +52,9 @@ export interface YouthCenterIngestReport {
   parseFailures: number;
   activeTargets: number;
   sourceCreated: boolean;
+  detailsFetched: number;
+  detailsFailed: number;
+  detailsPending: number;
 }
 
 interface YouthCenterIngestDependencies {
@@ -58,6 +65,8 @@ interface YouthCenterIngestDependencies {
   loadExisting: typeof loadExistingYouthCenterAnnouncements;
   buildPlan: typeof buildYouthCenterSyncPlan;
   storePlan: typeof storeYouthCenterPlan;
+  loadDetailCandidates: typeof loadYouthCenterDetailCandidates;
+  storeDetails: typeof fetchAndStoreYouthCenterDetails;
   nowMs: () => number;
 }
 
@@ -74,6 +83,8 @@ const productionDependencies: YouthCenterIngestDependencies = {
   loadExisting: loadExistingYouthCenterAnnouncements,
   buildPlan: buildYouthCenterSyncPlan,
   storePlan: storeYouthCenterPlan,
+  loadDetailCandidates: loadYouthCenterDetailCandidates,
+  storeDetails: fetchAndStoreYouthCenterDetails,
   nowMs: () => Date.now(),
 };
 
@@ -121,6 +132,32 @@ export async function runYouthCenterIngest(
     "STORE_FAILED",
     () => dependencies.storePlan(source.sourceId, source.created, plan),
   );
+  let detailsFetched = 0;
+  let detailsFailed = 0;
+  let detailsPending = 0;
+  let detailWriteCount = 0;
+  try {
+    const selection = await dependencies.loadDetailCandidates(
+      source.sourceId,
+      { limit: detailFetchLimit() },
+    );
+    detailsPending = Math.max(
+      0,
+      selection.totalEligible - selection.candidates.length,
+    );
+    const detailResult = await dependencies.storeDetails(
+      selection.candidates,
+      source.sourceId,
+    );
+    detailsFetched = detailResult.fetched;
+    detailsFailed = detailResult.failed;
+    detailWriteCount = detailResult.writeCount;
+  } catch (error) {
+    console.error(
+      "[youthcenter] 원문 수집 단계 실패:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+  }
   const upsertDurationMs = elapsed(upsertStartedAt, dependencies.nowMs());
 
   return {
@@ -135,7 +172,10 @@ export async function runYouthCenterIngest(
     apiVariant: fetched.apiVariant,
     pagesFetched: fetched.pagesFetched,
     apiCallCount: fetched.requestCount,
-    dbWriteCount: stored.writeRequests + (source.created ? 1 : 0),
+    dbWriteCount:
+      stored.writeRequests +
+      detailWriteCount +
+      (source.created ? 1 : 0),
     fetchDurationMs,
     transformDurationMs,
     upsertDurationMs,
@@ -143,6 +183,9 @@ export async function runYouthCenterIngest(
     parseFailures: prepared.parseFailureCount,
     activeTargets: plan.activeUpserts.length,
     sourceCreated: source.created,
+    detailsFetched,
+    detailsFailed,
+    detailsPending,
   };
 }
 
@@ -165,4 +208,10 @@ async function phase<T>(
 
 function elapsed(startedAt: number, endedAt: number) {
   return Math.max(0, Math.round(endedAt - startedAt));
+}
+
+function detailFetchLimit() {
+  const configured = Number(process.env.DETAIL_FETCH_LIMIT_PER_SOURCE ?? 8);
+  if (!Number.isFinite(configured)) return 8;
+  return Math.min(20, Math.max(0, Math.floor(configured)));
 }

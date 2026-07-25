@@ -176,6 +176,16 @@ function dependencies(existingKeys: string[]) {
       absentExistingRowsUntouched: plan.absentExistingRowsUntouched,
       writeRequests: 2,
     }),
+    loadDetailCandidates: async () => ({
+      candidates: [],
+      totalEligible: 0,
+      skippedCooldown: 0,
+    }),
+    storeDetails: async () => ({
+      fetched: 0,
+      failed: 0,
+      writeCount: 0,
+    }),
     nowMs: () => ++clock,
   };
 }

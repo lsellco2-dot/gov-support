@@ -59,22 +59,43 @@ export function YouthCenterPolicyDetails({
   const originalUrl =
     safeExternalHttpUrl(item.original_url) ??
     (!applicationUrl ? safeExternalHttpUrl(item.detail_url) : null);
-  const hasBlocks = Boolean(item.support_content || item.apply_method);
+  const hasStoredOriginal = Boolean(
+    item.detail_fetched_at && item.detail_content,
+  );
+  const hasBlocks = Boolean(
+    hasStoredOriginal || item.support_content || item.apply_method,
+  );
 
   return (
     <>
       {hasBlocks && (
         <div className={`${compact ? "mt-5 space-y-5" : "mt-6 space-y-7"} border-t border-line pt-5`}>
-          <PolicyBlock
-            title="지원 내용"
-            value={item.support_content}
-            compact={compact}
-          />
-          <PolicyBlock
-            title="신청방법"
-            value={item.apply_method}
-            compact={compact}
-          />
+          {hasStoredOriginal ? (
+            <PolicyBlock
+              title="상세내용"
+              value={item.detail_content}
+              compact={compact}
+            />
+          ) : (
+            <>
+              <PolicyBlock
+                title="지원 내용"
+                value={item.support_content}
+                compact={compact}
+              />
+              <PolicyBlock
+                title="신청방법"
+                value={item.apply_method}
+                compact={compact}
+              />
+            </>
+          )}
+          {(item.attachments?.length ?? 0) > 0 && (
+            <PolicyAttachmentList
+              links={item.attachments}
+              compact={compact}
+            />
+          )}
         </div>
       )}
 
@@ -96,6 +117,46 @@ export function YouthCenterPolicyDetails({
         최종 확인해 주세요.
       </p>
     </>
+  );
+}
+
+function PolicyAttachmentList({
+  links,
+  compact,
+}: {
+  links: { label: string; url: string }[];
+  compact: boolean;
+}) {
+  return (
+    <section className="border-t border-slate-200 pt-5">
+      <h2 className={`font-bold text-ink ${compact ? "text-sm" : "text-base"}`}>
+        첨부파일
+      </h2>
+      <ul className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
+        {links.map((link) => (
+          <li
+            key={`${link.label}-${link.url}`}
+            className={`flex gap-3 py-3 ${
+              compact
+                ? "flex-col text-xs"
+                : "flex-col text-sm sm:flex-row sm:items-center sm:justify-between"
+            }`}
+          >
+            <span className="min-w-0 break-words text-slate-700">
+              {link.label}
+            </span>
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-md border border-slate-300 px-4 font-semibold text-ink"
+            >
+              다운로드
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
