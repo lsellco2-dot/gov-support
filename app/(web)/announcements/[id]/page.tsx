@@ -6,6 +6,12 @@ import LeadForm from "@/components/LeadForm";
 import DetailContentBody from "@/components/DetailContentBody";
 import { getAnnouncement } from "@/lib/query/announcements";
 import { EXPERT_CONSULTATION_ENABLED } from "@/lib/features";
+import { AnnouncementSourceBadge } from "@/components/AnnouncementPolicyMeta";
+import {
+  YouthCenterPolicyDetails,
+  YouthCenterPolicyOverview,
+} from "@/components/YouthCenterPolicyDetail";
+import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +20,13 @@ export default async function DetailPage({ params }: { params: { id: string } })
   if (!Number.isInteger(id)) notFound();
   const item = await getAnnouncement(id);
   if (!item) notFound();
+  const isYouthCenter = isYouthCenterSource(item.source_code);
   const hasDetailedInfo = Boolean(
     (item.detail_content && item.detail_content !== item.summary) ||
       item.apply_method ||
       item.documents ||
       item.contact ||
+      item.support_content ||
       item.extra_sections?.length ||
       item.attachments?.length
   );
@@ -30,6 +38,14 @@ export default async function DetailPage({ params }: { params: { id: string } })
         ← 목록으로
       </Link>
       <div className="mt-3 rounded-lg border border-line bg-white p-6">
+        {isYouthCenter && (
+          <div className="mb-3">
+            <AnnouncementSourceBadge
+              sourceCode={item.source_code}
+              sourceName={item.source_name}
+            />
+          </div>
+        )}
         <div className="flex items-start justify-between gap-3">
           <h1 className="min-w-0 break-words text-xl font-bold leading-snug text-ink">{item.title}</h1>
           <DDayBadge applyEnd={item.apply_end} />
@@ -38,14 +54,18 @@ export default async function DetailPage({ params }: { params: { id: string } })
           <CategoryChips ids={item.category_ids} />
         </div>
 
-        <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-line bg-slate-50 p-4 text-sm sm:grid-cols-2">
-          <Row k="소관/수행기관" v={item.organization} />
-          <Row k="지역" v={item.region} />
-          <Row k="지원대상" v={item.target} />
-          <Row k="지원형태" v={item.support_type} />
-          <Row k="접수 시작" v={item.apply_start ?? "정보 없음"} />
-          <Row k="접수 마감" v={item.apply_end ?? (item.apply_start ? "상시/미정" : "정보 없음")} />
-        </dl>
+        {isYouthCenter ? (
+          <YouthCenterPolicyOverview item={item} />
+        ) : (
+          <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 rounded-lg border border-line bg-slate-50 p-4 text-sm sm:grid-cols-2">
+            <Row k="소관/수행기관" v={item.organization} />
+            <Row k="지역" v={item.region} />
+            <Row k="지원대상" v={item.target} />
+            <Row k="지원형태" v={item.support_type} />
+            <Row k="접수 시작" v={item.apply_start ?? "정보 없음"} />
+            <Row k="접수 마감" v={item.apply_end ?? (item.apply_start ? "상시/미정" : "정보 없음")} />
+          </dl>
+        )}
 
         {item.summary && (
           <p className="mt-5 whitespace-pre-line rounded-lg border-l-4 border-primary bg-primary-light p-4 text-sm leading-relaxed text-ink">
@@ -58,7 +78,8 @@ export default async function DetailPage({ params }: { params: { id: string } })
           </p>
         )}
 
-        {hasDetailedInfo && (
+        {isYouthCenter && <YouthCenterPolicyDetails item={item} />}
+        {!isYouthCenter && hasDetailedInfo && (
           <div className="mt-6 space-y-7 border-t border-line pt-6">
             {item.source_id === 2 && (
               <div className="rounded-lg border-l-4 border-info bg-[#EAF3FB] px-5 py-4 text-sm leading-relaxed text-ink">
@@ -85,7 +106,7 @@ export default async function DetailPage({ params }: { params: { id: string } })
           </div>
         )}
 
-        {item.detail_url && (
+        {!isYouthCenter && item.detail_url && (
           <a
             href={item.detail_url}
             target="_blank"
@@ -95,15 +116,17 @@ export default async function DetailPage({ params }: { params: { id: string } })
             공고 원문 보기 →
           </a>
         )}
-        {!item.detail_url && (
+        {!isYouthCenter && !item.detail_url && (
           <p className="mt-6 rounded-lg border border-line bg-slate-50 p-4 text-sm text-subtle">
             원문 링크가 제공되지 않은 공고입니다. 정확한 내용은 소관 기관에 확인해 주세요.
           </p>
         )}
 
-        <p className="mt-4 text-xs text-slate-400">
-          출처: {item.organization ?? "해당 기관"} · 공공데이터포털 — 정확한 내용은 반드시 원문 공고를 확인하세요.
-        </p>
+        {!isYouthCenter && (
+          <p className="mt-4 text-xs text-slate-400">
+            출처: {item.organization ?? "해당 기관"} · 공공데이터포털 — 정확한 내용은 반드시 원문 공고를 확인하세요.
+          </p>
+        )}
       </div>
 
       {EXPERT_CONSULTATION_ENABLED && (

@@ -8,6 +8,12 @@ import DetailContentBody from "@/components/DetailContentBody";
 import FavoriteButton from "@/components/FavoriteButton";
 import { getAnnouncement } from "@/lib/query/announcements";
 import { EXPERT_CONSULTATION_ENABLED } from "@/lib/features";
+import { AnnouncementSourceBadge } from "@/components/AnnouncementPolicyMeta";
+import {
+  YouthCenterPolicyDetails,
+  YouthCenterPolicyOverview,
+} from "@/components/YouthCenterPolicyDetail";
+import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +22,13 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
   if (!Number.isInteger(id)) notFound();
   const item = await getAnnouncement(id);
   if (!item) notFound();
+  const isYouthCenter = isYouthCenterSource(item.source_code);
   const hasDetailedInfo = Boolean(
     (item.detail_content && item.detail_content !== item.summary) ||
       item.apply_method ||
       item.documents ||
       item.contact ||
+      item.support_content ||
       item.extra_sections?.length ||
       item.attachments?.length
   );
@@ -33,17 +41,29 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
         <ShareButton title={item.title} />
       </div>
       <div className="mt-2 rounded-lg border border-line bg-white p-4">
+        {isYouthCenter && (
+          <div className="mb-2">
+            <AnnouncementSourceBadge
+              sourceCode={item.source_code}
+              sourceName={item.source_name}
+            />
+          </div>
+        )}
         <div className="flex items-start justify-between gap-2">
           <h1 className="min-w-0 break-words text-base font-bold leading-snug text-ink">{item.title}</h1>
           <DDayBadge applyEnd={item.apply_end} />
         </div>
         <div className="mt-2"><CategoryChips ids={item.category_ids} /></div>
-        <dl className="mt-4 space-y-2 rounded-lg border border-line bg-slate-50 p-3 text-sm">
-          <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">기관</dt><dd className="min-w-0 break-words text-ink">{item.organization ?? "정보 없음"}</dd></div>
-          <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">지역</dt><dd className="text-ink">{item.region ?? "전국"}</dd></div>
-          <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">대상</dt><dd className="min-w-0 break-words text-ink">{item.target ?? "정보 없음"}</dd></div>
-          <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">기간</dt><dd className="min-w-0 break-words text-ink">{formatApplyPeriod(item.apply_start, item.apply_end)}</dd></div>
-        </dl>
+        {isYouthCenter ? (
+          <YouthCenterPolicyOverview item={item} compact />
+        ) : (
+          <dl className="mt-4 space-y-2 rounded-lg border border-line bg-slate-50 p-3 text-sm">
+            <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">기관</dt><dd className="min-w-0 break-words text-ink">{item.organization ?? "정보 없음"}</dd></div>
+            <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">지역</dt><dd className="text-ink">{item.region ?? "전국"}</dd></div>
+            <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">대상</dt><dd className="min-w-0 break-words text-ink">{item.target ?? "정보 없음"}</dd></div>
+            <div className="flex gap-2"><dt className="w-12 shrink-0 font-medium text-subtle">기간</dt><dd className="min-w-0 break-words text-ink">{formatApplyPeriod(item.apply_start, item.apply_end)}</dd></div>
+          </dl>
+        )}
         {item.summary && (
           <p className="mt-4 whitespace-pre-line rounded-lg border-l-4 border-primary bg-primary-light p-3 text-sm leading-relaxed text-ink">
             {item.summary}
@@ -67,7 +87,8 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
             original_url: item.detail_url,
           }}
         />
-        {hasDetailedInfo && (
+        {isYouthCenter && <YouthCenterPolicyDetails item={item} compact />}
+        {!isYouthCenter && hasDetailedInfo && (
           <div className="mt-5 space-y-5 border-t border-line pt-5">
             {item.source_id === 2 && (
               <div className="rounded-lg border-l-4 border-info bg-[#EAF3FB] px-4 py-3 text-xs leading-relaxed text-ink">
@@ -93,7 +114,7 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
             )}
           </div>
         )}
-        {item.detail_url && (
+        {!isYouthCenter && item.detail_url && (
           <a
             href={item.detail_url}
             className="mt-4 flex h-12 items-center justify-center rounded-md border border-primary text-sm font-semibold text-primary"
@@ -101,14 +122,16 @@ export default async function AppDetail({ params }: { params: { id: string } }) 
             공고 원문 보기 →
           </a>
         )}
-        {!item.detail_url && (
+        {!isYouthCenter && !item.detail_url && (
           <p className="mt-4 rounded-lg border border-line bg-slate-50 p-3 text-xs leading-relaxed text-subtle">
             원문 링크가 제공되지 않은 공고입니다. 정확한 내용은 소관 기관에 확인해 주세요.
           </p>
         )}
-        <p className="mt-3 text-[11px] text-slate-400">
-          출처: {item.organization ?? "해당 기관"} · 공공데이터포털 — 정확한 내용은 원문 공고를 확인하세요.
-        </p>
+        {!isYouthCenter && (
+          <p className="mt-3 text-[11px] text-slate-400">
+            출처: {item.organization ?? "해당 기관"} · 공공데이터포털 — 정확한 내용은 원문 공고를 확인하세요.
+          </p>
+        )}
       </div>
 
       {EXPERT_CONSULTATION_ENABLED && (

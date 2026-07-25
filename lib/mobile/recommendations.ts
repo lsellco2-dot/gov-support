@@ -1,5 +1,9 @@
 import type { NativeUserCondition } from "./app-bridge";
-import { matchesCompatibleRegion } from "@/lib/regions";
+import {
+  announcementRegionValues,
+  isNationwideAnnouncementRegion,
+  matchAnnouncementRegion,
+} from "@/lib/regions";
 
 export const INTEREST_CATEGORY_IDS: Record<string, number> = {
   startup_support: 1,
@@ -16,6 +20,7 @@ export const INTEREST_CATEGORY_IDS: Record<string, number> = {
 export interface OpenAnnouncement {
   id: number;
   source?: string | null;
+  source_name?: string | null;
   title: string;
   agency: string | null;
   category_ids: number[];
@@ -28,6 +33,11 @@ export interface OpenAnnouncement {
   created_at: string;
   detail_url: string;
   original_url: string | null;
+  regions?: string[] | null;
+  age_min?: number | null;
+  age_max?: number | null;
+  policy_domain?: string | null;
+  source_status?: "open" | "upcoming" | "always" | "closed" | "unknown" | null;
 }
 
 export interface RecommendationResult {
@@ -64,7 +74,11 @@ export function evaluateRecommendation(
     .sort((a, b) => a - b);
   if (matchedCategoryIds.length === 0) return null;
 
-  const region = matchRegion(condition.region, announcement.region);
+  const region = matchRegion(
+    condition.region,
+    announcement.region,
+    announcement.regions,
+  );
   if (region === "conflict") return null;
   const target = matchTarget(condition.user_type, announcement.target);
   if (target === "conflict") return null;
@@ -99,8 +113,14 @@ export function filterNationwideRecommendations(
   if (includeNationwide || isNationwideUserRegion(userRegion)) return recommendations;
   return recommendations.filter(
     ({ announcement }) =>
-      Boolean(announcement.region?.trim()) &&
-      !isNationwideRegion(announcement.region),
+      announcementRegionValues(
+        announcement.region,
+        announcement.regions,
+      ).length > 0 &&
+      !isNationwideAnnouncementRegion(
+        announcement.region,
+        announcement.regions,
+      ),
   );
 }
 
@@ -109,24 +129,21 @@ export function isNationwideUserRegion(region: string) {
   return value === "nationwide" || value === "전국";
 }
 
-function isNationwideRegion(region: string | null) {
-  if (!region?.trim()) return false;
-  const value = region.trim().toLowerCase();
-  return value === "nationwide" || value.includes("전국");
-}
-
-function matchRegion(userRegion: string, announcementRegion: string | null): FieldMatch {
+function matchRegion(
+  userRegion: string,
+  announcementRegion: string | null,
+  announcementRegions: string[] | null | undefined,
+): FieldMatch {
   if (userRegion === "nationwide") return "match";
-  if (!announcementRegion?.trim()) return "unknown";
-  const value = announcementRegion.trim().toLowerCase();
-  if (value === "nationwide" || value.includes("전국")) return "match";
   const expected =
     REGION_LABELS[userRegion] ??
     (/[가-힣]/.test(userRegion) ? userRegion.trim() : null);
   if (!expected) return "unknown";
-  return matchesCompatibleRegion(expected, announcementRegion)
-    ? "match"
-    : "conflict";
+  return matchAnnouncementRegion(
+    expected,
+    announcementRegion,
+    announcementRegions,
+  );
 }
 
 function matchTarget(userType: string, announcementTarget: string | null): FieldMatch {

@@ -19,6 +19,11 @@ import {
 } from "@/lib/mobile/recommendations";
 import { announcementSourceLabel } from "@/lib/mobile/announcement-source";
 import { loadRecommendationBatch } from "@/lib/mobile/recommendation-pages";
+import {
+  YouthPolicyChips,
+  YouthPolicyRegion,
+} from "./AnnouncementPolicyMeta";
+import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
 
 type State = "loading" | "browser" | "outdated" | "ready" | "error" | "no-condition";
 
@@ -177,15 +182,31 @@ export default function AppRecommendationsPage() {
                   applyStart={announcement.apply_start}
                   applyEnd={announcement.apply_end}
                   status={announcement.status}
+                  sourceStatus={announcement.source_status}
                 />
               </div>
               <div className="mt-2">
                 <span className="inline-flex rounded-badge bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
-                  출처: {announcementSourceLabel(announcement.source)}
+                  출처: {announcementSourceLabel(announcement.source, announcement.source_name)}
                 </span>
               </div>
               <p className="mt-2 text-xs text-subtle">기관: {announcement.agency ?? "정보 없음"}</p>
-              <p className="mt-1 text-xs text-subtle">지역: {announcement.region ?? "확인 필요"}</p>
+              <p className="mt-1 break-words text-xs text-subtle">
+                지역:{" "}
+                <YouthPolicyRegion
+                  sourceCode={announcement.source}
+                  region={announcement.region}
+                  regions={announcement.regions}
+                />
+                {!isYouthCenterSource(announcement.source) &&
+                  (announcement.region ?? "확인 필요")}
+              </p>
+              <YouthPolicyChips
+                sourceCode={announcement.source}
+                policyDomain={announcement.policy_domain}
+                ageMin={announcement.age_min}
+                ageMax={announcement.age_max}
+              />
               <div className="mt-3">
                 <p className="mb-1 text-[11px] font-semibold text-subtle">관심 분야 일치</p>
                 <CategoryChips ids={matchedCategoryIds} />

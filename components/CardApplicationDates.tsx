@@ -2,14 +2,28 @@ export default function CardApplicationDates({
   applyStart,
   applyEnd,
   status,
+  sourceStatus,
 }: {
   applyStart: string | null;
   applyEnd: string | null;
   status?: "open" | "closed" | null;
+  sourceStatus?: "open" | "upcoming" | "always" | "closed" | "unknown" | null;
 }) {
   const display = getCardDateDisplay(applyStart, applyEnd);
   const receptionLabel =
-    status === "open" ? "접수중" : status === "closed" ? null : display.receptionLabel;
+    sourceStatus === "upcoming"
+      ? "접수예정"
+      : sourceStatus === "open" || sourceStatus === "always"
+        ? "접수중"
+        : sourceStatus === "closed"
+          ? null
+          : status === "open"
+            ? "접수중"
+            : status === "closed"
+              ? null
+              : display.receptionLabel;
+  const deadlineLabel =
+    sourceStatus === "always" ? "상시" : sourceStatus === "closed" ? "마감" : display.deadlineLabel;
   return (
     <div className="flex min-w-[112px] shrink-0 flex-col items-end gap-1 text-right">
       {receptionLabel && (
@@ -24,7 +38,7 @@ export default function CardApplicationDates({
             : "bg-slate-100 text-subtle"
         }`}
       >
-        {display.deadlineLabel}
+        {deadlineLabel}
       </span>
     </div>
   );

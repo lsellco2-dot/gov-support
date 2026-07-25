@@ -15,12 +15,25 @@ import {
   sortFavoriteAnnouncements,
   type FavoriteSort,
 } from "@/lib/mobile/favorite-sort";
+import {
+  loadAnnouncementDisplayMetadata,
+  type AnnouncementDisplayMetadata,
+} from "@/lib/mobile/announcement-display-client";
+import {
+  AnnouncementSourceBadge,
+  YouthPolicyChips,
+  YouthPolicyRegion,
+} from "./AnnouncementPolicyMeta";
+import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
 
 type State = "loading" | "browser" | "outdated" | "empty" | "ready" | "error";
 
 export default function AppFavoritesPage() {
   const [state, setState] = useState<State>("loading");
   const [items, setItems] = useState<NativeFavoriteAnnouncement[]>([]);
+  const [metadata, setMetadata] = useState<
+    Map<number, AnnouncementDisplayMetadata>
+  >(new Map());
   const [sort, setSort] = useState<FavoriteSort>("latest");
   const sortedItems = useMemo(() => sortFavoriteAnnouncements(items, sort), [items, sort]);
 
@@ -38,6 +51,13 @@ export default function AppFavoritesPage() {
     }
     setItems(result.data);
     setState(result.data.length ? "ready" : "empty");
+    void loadAnnouncementDisplayMetadata(result.data.map((item) => item.id))
+      .then((displayMetadata) => {
+        setMetadata(new Map(displayMetadata.map((item) => [item.id, item])));
+      })
+      .catch(() => {
+        // Android에 저장된 기존 스냅샷은 그대로 표시하고 부가 정보만 생략한다.
+      });
   }, []);
 
   useEffect(() => {
@@ -99,39 +119,67 @@ export default function AppFavoritesPage() {
           <option value="deadline">마감 임박순</option>
         </select>
       </div>
-      {sortedItems.map((item) => (
-        <article key={item.id} className="rounded-lg border border-line bg-white p-4">
-          <div className="flex items-start justify-between gap-3">
-            <h2 className="min-w-0 break-words text-sm font-bold leading-snug text-ink">{item.title}</h2>
-            <CardApplicationDates
-              applyStart={null}
-              applyEnd={item.apply_end}
-              status={item.status}
+      {sortedItems.map((item) => {
+        const display = metadata.get(item.id);
+        return (
+          <article key={item.id} className="min-w-0 rounded-lg border border-line bg-white p-4">
+            {isYouthCenterSource(display?.source_code) && (
+              <div className="mb-2">
+                <AnnouncementSourceBadge
+                  sourceCode={display?.source_code}
+                  sourceName={display?.source_name}
+                />
+              </div>
+            )}
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="min-w-0 break-words text-sm font-bold leading-snug text-ink">{item.title}</h2>
+              <CardApplicationDates
+                applyStart={null}
+                applyEnd={item.apply_end}
+                status={item.status}
+                sourceStatus={display?.source_status}
+              />
+            </div>
+            <p className="mt-2 break-words text-xs text-subtle">{item.agency ?? "기관 정보 없음"}</p>
+            {isYouthCenterSource(display?.source_code) && (
+              <p className="mt-1 break-words text-xs text-subtle">
+                지역:{" "}
+                <YouthPolicyRegion
+                  sourceCode={display?.source_code}
+                  region={display?.region ?? item.region}
+                  regions={display?.regions}
+                />
+              </p>
+            )}
+            <YouthPolicyChips
+              sourceCode={display?.source_code}
+              policyDomain={display?.policy_domain}
+              ageMin={display?.age_min}
+              ageMax={display?.age_max}
             />
-          </div>
-          <p className="mt-2 break-words text-xs text-subtle">{item.agency ?? "기관 정보 없음"}</p>
-          <Link
-            href={`/app/announcements/${item.id}`}
-            className="mt-3 flex h-11 items-center justify-center rounded-md bg-primary text-xs font-semibold text-white"
-          >
-            상세보기
-          </Link>
-          <FavoriteButton
-            compact
-            announcement={{
-              id: item.id,
-              title: item.title,
-              agency: item.agency,
-              category_ids: item.category_ids,
-              region: item.region,
-              status: item.status,
-              apply_end: item.apply_end,
-              detail_url: item.detail_url,
-              original_url: item.original_url,
-            }}
-          />
-        </article>
-      ))}
+            <Link
+              href={`/app/announcements/${item.id}`}
+              className="mt-3 flex h-11 items-center justify-center rounded-md bg-primary text-xs font-semibold text-white"
+            >
+              상세보기
+            </Link>
+            <FavoriteButton
+              compact
+              announcement={{
+                id: item.id,
+                title: item.title,
+                agency: item.agency,
+                category_ids: item.category_ids,
+                region: item.region,
+                status: item.status,
+                apply_end: item.apply_end,
+                detail_url: item.detail_url,
+                original_url: item.original_url,
+              }}
+            />
+          </article>
+        );
+      })}
     </div>
   );
 }

@@ -151,3 +151,61 @@ test("applies the same nationwide filter to later pages and excludes unknown reg
   );
   assert.deepEqual(ids, [1]);
 });
+
+test("matches a multi-region policy when any array region is compatible", () => {
+  const result = evaluateRecommendation(condition, {
+    ...announcement,
+    region: null,
+    regions: ["경기", "서울"],
+  });
+  assert.ok(result);
+  assert.equal(result.needsAdditionalReview, false);
+  assert.deepEqual(result.reasons, ["관심 분야 일치", "지역 일치"]);
+});
+
+test("regions take priority over a conflicting legacy scalar region", () => {
+  assert.ok(
+    evaluateRecommendation(condition, {
+      ...announcement,
+      region: "부산",
+      regions: ["서울"],
+    }),
+  );
+  assert.equal(
+    evaluateRecommendation(condition, {
+      ...announcement,
+      region: "서울",
+      regions: ["부산"],
+    }),
+    null,
+  );
+});
+
+test("legacy Gwangju and Jeonnam users match the integrated policy region", () => {
+  const integrated = {
+    ...announcement,
+    region: null,
+    regions: ["전남광주통합특별시"],
+  };
+  assert.ok(
+    evaluateRecommendation({ ...condition, region: "gwangju" }, integrated),
+  );
+  assert.ok(
+    evaluateRecommendation({ ...condition, region: "jeonnam" }, integrated),
+  );
+});
+
+test("nationwide exclusion rejects nationwide arrays and keeps regional arrays", () => {
+  const recommendations = matchRecommendations(condition, [
+    { ...announcement, id: 1, region: null, regions: ["서울", "경기"] },
+    { ...announcement, id: 2, region: "서울", regions: ["전국"] },
+    { ...announcement, id: 3, region: null, regions: null },
+  ]);
+
+  assert.deepEqual(
+    filterNationwideRecommendations(recommendations, "seoul", false).map(
+      ({ announcement: item }) => item.id,
+    ),
+    [1],
+  );
+});

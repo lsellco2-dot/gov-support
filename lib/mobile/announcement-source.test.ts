@@ -12,8 +12,10 @@ test("maps source ids to public source codes", () => {
 
 test("maps public source codes to user-facing labels", () => {
   assert.deepEqual(
-    ["kstartup", "bizinfo", "mss", "mois", "msit"].map(announcementSourceLabel),
-    ["K-Startup", "기업마당", "중소벤처기업부", "행정안전부", "과학기술정보통신부"],
+    ["kstartup", "bizinfo", "mss", "mois", "msit", "youthcenter"].map(
+      (source) => announcementSourceLabel(source),
+    ),
+    ["K-Startup", "기업마당", "중소벤처기업부", "행정안전부", "과학기술정보통신부", "온통청년"],
   );
 });
 
@@ -21,4 +23,5 @@ test("uses a safe label when source is absent or unknown", () => {
   assert.equal(announcementSourceLabel(undefined), "출처 정보 없음");
   assert.equal(announcementSourceLabel(null), "출처 정보 없음");
   assert.equal(announcementSourceLabel("legacy"), "출처 정보 없음");
+  assert.equal(announcementSourceLabel("legacy", "기존 출처"), "기존 출처");
 });

@@ -2,7 +2,20 @@ import { supabaseAnon } from "@/lib/supabase/anon";
 import { FIXTURES } from "./fixtures";
 import { sanitizeDisplayRow, sanitizeDisplayText } from "@/lib/text/sanitize";
 import { normalizeMsitAttachmentProxyUrl } from "@/lib/ingest/msit-attachments";
-import { compatibleRegionLabels } from "@/lib/regions";
+import {
+  announcementRegionPostgrestFilter,
+  isNationwideAnnouncementRegion,
+  matchAnnouncementRegion,
+} from "@/lib/regions";
+import {
+  detailSection,
+  isYouthCenterSource,
+  normalizePresentationFields,
+  safeExternalHttpUrl,
+  youthCenterDetailFields,
+  type AnnouncementPresentationFields,
+  type YouthCenterDetailFields,
+} from "./announcement-presentation";
 
 // Supabase 미연결 상태에서 UI 개발용: fixtures를 메모리에서 검색/필터/정렬/페이지네이션
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
@@ -25,7 +38,7 @@ export interface ListParams {
 
 export type AudienceGroup = "all" | "business" | "worker";
 
-export interface AnnouncementRow {
+export interface AnnouncementRow extends AnnouncementPresentationFields {
   id: number;
   source_id: number;
   source_key?: string;
@@ -55,12 +68,21 @@ export interface DetailSection {
 
 export interface AnnouncementDetail extends AnnouncementRow {
   detail_content: string | null;
+  support_content: string | null;
   apply_method: string | null;
   documents: string | null;
   contact: string | null;
   attachments: DetailLink[];
   extra_sections: DetailSection[];
   detail_fetched_at: string | null;
+  managing_organization: string | null;
+  income_condition: string | null;
+  education_condition: string | null;
+  employment_condition: string | null;
+  major_condition: string | null;
+  specialty_condition: string | null;
+  application_url: string | null;
+  original_url: string | null;
 }
 
 export interface AnnouncementListResult {
@@ -148,21 +170,21 @@ function listFromFixtures(p: ListParams, page: number, size: number) {
   }
   if (p.recommendationRegion) {
     const { label, includeNationwide } = p.recommendationRegion;
-    const compatibleLabels = compatibleRegionLabels(label);
     rows = rows.filter((r) => {
-      const region = r.region?.trim() ?? "";
-      if (!region) return includeNationwide;
-      return (
-        compatibleLabels.includes(region) ||
-        (includeNationwide && region === "전국")
-      );
+      const regions = (r as { regions?: string[] | null }).regions;
+      const match = matchAnnouncementRegion(label, r.region, regions);
+      if (!includeNationwide && isNationwideAnnouncementRegion(r.region, regions)) {
+        return false;
+      }
+      return match === "match" || (includeNationwide && match === "unknown");
     });
   } else if (p.region && p.region !== "전국") {
-    const compatibleLabels = compatibleRegionLabels(p.region);
-    rows = rows.filter(
-      (r) =>
-        (r.region !== null && compatibleLabels.includes(r.region)) ||
-        r.region === "전국",
+    rows = rows.filter((r) =>
+      matchAnnouncementRegion(
+        p.region!,
+        r.region,
+        (r as { regions?: string[] | null }).regions,
+      ) === "match",
     );
   }
 
@@ -205,7 +227,7 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
   let q = supabaseAnon
     .from("announcements_public")
     .select(
-      "id,source_id,title,organization,category_ids,region,target,support_type,summary,apply_start,apply_end,detail_url,status,created_at",
+      "id,source_id,title,organization,category_ids,region,target,support_type,summary,apply_start,apply_end,detail_url,status,created_at,regions",
       { count: "exact" }
     );
 
@@ -220,18 +242,17 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
   }
   if (p.recommendationRegion) {
     const { label, includeNationwide } = p.recommendationRegion;
-    const compatibleLabels = compatibleRegionLabels(label);
-    q = includeNationwide
-      ? q.or(
-          [
-            ...compatibleLabels.map((region) => `region.eq.${region}`),
-            "region.eq.전국",
-            "region.is.null",
-          ].join(","),
-        )
-      : q.in("region", compatibleLabels);
+    const filter = announcementRegionPostgrestFilter(label, {
+      includeNationwide,
+      includeUnknown: includeNationwide,
+    });
+    if (filter) q = q.or(filter);
   } else if (p.region && p.region !== "전국") {
-    q = q.in("region", [...compatibleRegionLabels(p.region), "전국"]);
+    const filter = announcementRegionPostgrestFilter(p.region, {
+      includeNationwide: true,
+      includeUnknown: false,
+    });
+    if (filter) q = q.or(filter);
   }
 
   if (sort === "latest") {
@@ -251,8 +272,11 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
     throw new Error(error.message);
   }
 
+  const rows = await enrichAnnouncementRows(
+    ((data ?? []) as unknown as AnnouncementRow[]).map(sanitizeDisplayRow),
+  );
   const result = {
-    items: ((data ?? []) as AnnouncementRow[]).map(sanitizeDisplayRow),
+    items: rows,
     total: count ?? 0,
     page,
     size,
@@ -311,6 +335,85 @@ function positiveInt(value: number | undefined, fallback: number) {
   return Math.max(1, Math.floor(value));
 }
 
+type SourceRecord = {
+  code: string;
+  name: string;
+};
+
+type PresentationRecord = {
+  id: number;
+  source_id: number;
+  region: string | null;
+  regions: unknown;
+  age_min: unknown;
+  age_max: unknown;
+  policy_domain: unknown;
+  source_status: unknown;
+  sources?: unknown;
+};
+
+async function enrichAnnouncementRows(rows: AnnouncementRow[]) {
+  if (rows.length === 0) return rows;
+  const ids = [...new Set(rows.map((row) => row.id))];
+  const { data, error } = await supabaseAnon
+    .from("announcements")
+    .select(
+      "id,source_id,region,regions,age_min,age_max,policy_domain,source_status,sources(code,name)",
+    )
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+
+  const records = (data ?? []) as unknown as PresentationRecord[];
+  const metadata = new Map(
+    records.map((record) => [
+      record.id,
+      {
+        region: sanitizeDisplayText(record.region),
+        ...normalizePresentationFields(
+          record as unknown as Record<string, unknown>,
+          sourceRelation(record.sources),
+        ),
+      },
+    ]),
+  );
+
+  return rows.map((row) => ({ ...row, ...metadata.get(row.id) }));
+}
+
+export async function getAnnouncementPresentations(ids: number[]) {
+  const validIds = [...new Set(ids)]
+    .filter((id) => Number.isSafeInteger(id) && id > 0)
+    .slice(0, 100);
+  if (validIds.length === 0) return [];
+
+  const { data, error } = await supabaseAnon
+    .from("announcements")
+    .select(
+      "id,source_id,region,regions,age_min,age_max,policy_domain,source_status,sources(code,name)",
+    )
+    .in("id", validIds);
+  if (error) throw new Error(error.message);
+
+  const records = (data ?? []) as unknown as PresentationRecord[];
+  return records.map((record) => ({
+    id: record.id,
+    region: sanitizeDisplayText(record.region),
+    ...normalizePresentationFields(
+      record as unknown as Record<string, unknown>,
+      sourceRelation(record.sources),
+    ),
+  }));
+}
+
+function sourceRelation(value: unknown): SourceRecord | null {
+  const source = Array.isArray(value) ? value[0] : value;
+  if (!source || typeof source !== "object") return null;
+  const record = source as Record<string, unknown>;
+  return typeof record.code === "string" && typeof record.name === "string"
+    ? { code: record.code, name: record.name }
+    : null;
+}
+
 export async function getAnnouncement(id: number) {
   if (USE_MOCK) {
     return (FIXTURES.find((r) => r.id === id) ?? null) as
@@ -320,21 +423,46 @@ export async function getAnnouncement(id: number) {
 
   const { data, error } = await supabaseAnon
     .from("announcements")
-    .select("*")
+    .select(
+      "id,source_id,source_key,title,organization,category_ids,region,regions,target,support_type,summary,apply_start,apply_end,age_min,age_max,policy_domain,source_status,detail_url,detail_content,apply_method,documents,contact,attachments,detail_fetched_at,raw_json,created_at,sources(code,name)",
+    )
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
 
-  const detail = toDetail(data as AnnouncementRecord);
+  const detail = toDetail(
+    data as unknown as AnnouncementRecord,
+    sourceRelation(data.sources),
+  );
   return enrichKstartupDetail(detail);
 }
 
-type AnnouncementRecord = AnnouncementRow & {
+function emptyYouthCenterDetailFields(): YouthCenterDetailFields {
+  return {
+    managing_organization: null,
+    income_condition: null,
+    education_condition: null,
+    employment_condition: null,
+    major_condition: null,
+    specialty_condition: null,
+    application_url: null,
+    original_url: null,
+  };
+}
+
+type AnnouncementRecord = Omit<
+  AnnouncementRow,
+  keyof AnnouncementPresentationFields
+> & {
   source_key: string;
-  content_hash: string;
   raw_json: unknown;
-  updated_at: string;
+  regions?: unknown;
+  age_min?: unknown;
+  age_max?: unknown;
+  policy_domain?: unknown;
+  source_status?: unknown;
+  sources?: unknown;
   detail_content?: string | null;
   apply_method?: string | null;
   documents?: string | null;
@@ -343,8 +471,18 @@ type AnnouncementRecord = AnnouncementRow & {
   detail_fetched_at?: string | null;
 };
 
-function toDetail(row: AnnouncementRecord): AnnouncementDetail {
+function toDetail(
+  row: AnnouncementRecord,
+  source: SourceRecord | null,
+): AnnouncementDetail {
   const raw = unwrapRaw(row.raw_json);
+  const presentation = normalizePresentationFields(
+    row as unknown as Record<string, unknown>,
+    source,
+  );
+  const youthFields = isYouthCenterSource(presentation.source_code)
+    ? youthCenterDetailFields(row.raw_json)
+    : emptyYouthCenterDetailFields();
   const detailContent = cleanText(
     pickRaw(raw, ["pbanc_ctnt", "detail_content", "content", "summary"])
   );
@@ -353,6 +491,7 @@ function toDetail(row: AnnouncementRecord): AnnouncementDetail {
   );
 
   return {
+    ...presentation,
     id: row.id,
     source_id: row.source_id,
     source_key: row.source_key,
@@ -365,18 +504,32 @@ function toDetail(row: AnnouncementRecord): AnnouncementDetail {
     summary: sanitizeDisplayText(row.summary),
     apply_start: row.apply_start,
     apply_end: row.apply_end,
-    detail_url: safeHttpUrl(row.detail_url),
-    status: row.apply_end === null || row.apply_end >= todayKst() ? "open" : "closed",
+    detail_url: safeExternalHttpUrl(row.detail_url),
+    status:
+      presentation.source_status === "closed" ||
+      (row.apply_end !== null && row.apply_end < todayKst())
+        ? "closed"
+        : "open",
     created_at: row.created_at,
     // 저장된 원문 컬럼은 이미 정제된 텍스트라 cleanText(문단 빈 줄 붕괴)를 거치지 않는다.
     // 문단 구분(\n\n)이 상세 화면의 섹션 제목 위계 감지에 그대로 쓰인다.
     detail_content: sanitizeDisplayText(hasText(row.detail_content) ? row.detail_content! : detailContent),
-    apply_method: sanitizeDisplayText(hasText(row.apply_method) ? row.apply_method! : buildApplyMethod(raw)),
+    support_content: isYouthCenterSource(presentation.source_code)
+      ? detailSection(row.detail_content ?? detailContent, "지원 내용")
+      : null,
+    apply_method: sanitizeDisplayText(
+      hasText(row.apply_method)
+        ? row.apply_method!
+        : isYouthCenterSource(presentation.source_code)
+          ? detailSection(row.detail_content ?? detailContent, "신청 방법")
+          : buildApplyMethod(raw),
+    ),
     documents: sanitizeDisplayText(hasText(row.documents) ? row.documents! : documents),
     contact: sanitizeDisplayText(hasText(row.contact) ? row.contact! : buildContact(raw)),
     attachments: mergeLinks(storedLinks(row.attachments), buildLinks(raw)),
     extra_sections: [],
     detail_fetched_at: row.detail_fetched_at ?? null,
+    ...youthFields,
   };
 }
 

@@ -125,3 +125,40 @@ test("open announcements exposes only public fields and internal detail URL", ()
   assert.equal(payload.pagination.has_more, true);
   assert.equal(payload.pagination.total_pages, 3);
 });
+
+test("open announcements exposes YouthCenter display fields without raw data", () => {
+  const row = {
+    id: 11,
+    source_id: 77,
+    source_code: "youthcenter",
+    source_name: "온통청년",
+    title: "서울 청년 주거 지원",
+    organization: "서울특별시",
+    category_ids: [3],
+    region: "서울",
+    regions: ["서울"],
+    target: "서울 거주 청년",
+    support_type: "월세 지원",
+    summary: "요약",
+    apply_start: null,
+    apply_end: null,
+    age_min: 19,
+    age_max: 39,
+    policy_domain: "housing" as const,
+    source_status: "always" as const,
+    detail_url: "https://youth.example/11",
+    status: "open" as const,
+    created_at: "2026-07-12T00:00:00.000Z",
+  };
+  const payload = buildOpenAnnouncementsPayload(
+    { items: [row], total: 1, page: 1, size: 50 },
+    "https://gov-support-nine.vercel.app",
+  );
+
+  assert.equal(payload.data[0].source, "youthcenter");
+  assert.equal(payload.data[0].source_name, "온통청년");
+  assert.deepEqual(payload.data[0].regions, ["서울"]);
+  assert.equal(payload.data[0].policy_domain, "housing");
+  assert.equal(payload.data[0].source_status, "always");
+  assert.equal("raw_json" in payload.data[0], false);
+});

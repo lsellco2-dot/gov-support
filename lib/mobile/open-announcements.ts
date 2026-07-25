@@ -113,7 +113,8 @@ export function buildOpenAnnouncementsPayload(
 function toPublicItem(item: AnnouncementRow, origin: string) {
   return {
     id: item.id,
-    source: announcementSourceCode(item.source_id),
+    source: item.source_code ?? announcementSourceCode(item.source_id),
+    source_name: item.source_name ?? null,
     title: item.title,
     agency: item.organization,
     category_ids: item.category_ids,
@@ -126,6 +127,11 @@ function toPublicItem(item: AnnouncementRow, origin: string) {
     created_at: item.created_at,
     detail_url: new URL(`/app/announcements/${item.id}`, origin).toString(),
     original_url: item.detail_url,
+    regions: item.regions ?? null,
+    age_min: item.age_min ?? null,
+    age_max: item.age_max ?? null,
+    policy_domain: item.policy_domain ?? null,
+    source_status: item.source_status ?? null,
   };
 }
 

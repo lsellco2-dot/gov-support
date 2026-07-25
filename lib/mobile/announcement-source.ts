@@ -3,7 +3,8 @@ export type AnnouncementSourceCode =
   | "kstartup"
   | "mss"
   | "mois"
-  | "msit";
+  | "msit"
+  | "youthcenter";
 
 const SOURCE_CODE_BY_ID: Record<number, AnnouncementSourceCode> = {
   1: "bizinfo",
@@ -19,12 +20,20 @@ const SOURCE_LABELS: Record<AnnouncementSourceCode, string> = {
   mss: "중소벤처기업부",
   mois: "행정안전부",
   msit: "과학기술정보통신부",
+  youthcenter: "온통청년",
 };
 
 export function announcementSourceCode(sourceId: number) {
   return SOURCE_CODE_BY_ID[sourceId] ?? null;
 }
 
-export function announcementSourceLabel(source: string | null | undefined) {
-  return SOURCE_LABELS[source as AnnouncementSourceCode] ?? "출처 정보 없음";
+export function announcementSourceLabel(
+  source: string | null | undefined,
+  sourceName?: string | null,
+) {
+  return (
+    SOURCE_LABELS[source as AnnouncementSourceCode] ??
+    sourceName?.trim() ??
+    "출처 정보 없음"
+  );
 }
