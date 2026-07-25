@@ -349,6 +349,7 @@ type PresentationRecord = {
   age_max: unknown;
   policy_domain: unknown;
   source_status: unknown;
+  apply_method?: unknown;
   sources?: unknown;
 };
 
@@ -389,20 +390,22 @@ export async function getAnnouncementPresentations(ids: number[]) {
   const { data, error } = await supabaseAnon
     .from("announcements")
     .select(
-      "id,source_id,region,regions,age_min,age_max,policy_domain,source_status,sources(code,name)",
+      "id,source_id,region,regions,age_min,age_max,policy_domain,source_status,apply_method,sources(code,name)",
     )
     .in("id", validIds);
   if (error) throw new Error(error.message);
 
   const records = (data ?? []) as unknown as PresentationRecord[];
-  return records.map((record) => ({
-    id: record.id,
-    region: sanitizeDisplayText(record.region),
-    ...normalizePresentationFields(
-      record as unknown as Record<string, unknown>,
-      sourceRelation(record.sources),
-    ),
-  }));
+  return records
+    .filter(isPublicAnnouncementRecord)
+    .map((record) => ({
+      id: record.id,
+      region: sanitizeDisplayText(record.region),
+      ...normalizePresentationFields(
+        record as unknown as Record<string, unknown>,
+        sourceRelation(record.sources),
+      ),
+    }));
 }
 
 function sourceRelation(value: unknown): SourceRecord | null {
@@ -431,11 +434,27 @@ export async function getAnnouncement(id: number) {
   if (error) throw new Error(error.message);
   if (!data) return null;
 
+  const source = sourceRelation(data.sources);
+  if (
+    source?.code === "youthcenter" &&
+    !sanitizeDisplayText(data.apply_method)
+  ) {
+    return null;
+  }
   const detail = toDetail(
     data as unknown as AnnouncementRecord,
-    sourceRelation(data.sources),
+    source,
   );
   return enrichKstartupDetail(detail);
+}
+
+function isPublicAnnouncementRecord(record: PresentationRecord) {
+  const source = sourceRelation(record.sources);
+  return (
+    source?.code !== "youthcenter" ||
+    (typeof record.apply_method === "string" &&
+      Boolean(sanitizeDisplayText(record.apply_method)))
+  );
 }
 
 function emptyYouthCenterDetailFields(): YouthCenterDetailFields {
