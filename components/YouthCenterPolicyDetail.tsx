@@ -55,10 +55,12 @@ export function YouthCenterPolicyDetails({
   item: AnnouncementDetail;
   compact?: boolean;
 }) {
-  const applicationUrl = safeExternalHttpUrl(item.application_url);
+  // 다른 공고와 동일하게 "공고 원문 보기" 단일 CTA로 통일.
+  // 우선순위: 온통청년 정책 원문 → 신청 페이지 → 수집된 상세 URL
   const originalUrl =
     safeExternalHttpUrl(item.original_url) ??
-    (!applicationUrl ? safeExternalHttpUrl(item.detail_url) : null);
+    safeExternalHttpUrl(item.application_url) ??
+    safeExternalHttpUrl(item.detail_url);
   const hasStoredOriginal = Boolean(
     item.detail_fetched_at && item.detail_content,
   );
@@ -99,17 +101,29 @@ export function YouthCenterPolicyDetails({
         </div>
       )}
 
-      {(applicationUrl || originalUrl) && (
-        <div className={`flex flex-col gap-2 sm:flex-row ${compact ? "mt-4" : "mt-6"}`}>
-          {applicationUrl && (
-            <ExternalAction href={applicationUrl} primary>
-              신청하기
-            </ExternalAction>
-          )}
-          {originalUrl && originalUrl !== applicationUrl && (
-            <ExternalAction href={originalUrl}>원문 확인</ExternalAction>
-          )}
-        </div>
+      {originalUrl ? (
+        <a
+          href={originalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={
+            compact
+              ? "mt-4 flex h-12 items-center justify-center rounded-md border border-primary text-sm font-semibold text-primary"
+              : "mt-6 inline-flex h-12 w-full items-center justify-center rounded-md border border-primary text-sm font-semibold text-primary transition hover:bg-primary-light sm:w-auto sm:px-6"
+          }
+        >
+          공고 원문 보기 →
+        </a>
+      ) : (
+        <p
+          className={
+            compact
+              ? "mt-4 rounded-lg border border-line bg-slate-50 p-3 text-xs leading-relaxed text-subtle"
+              : "mt-6 rounded-lg border border-line bg-slate-50 p-4 text-sm text-subtle"
+          }
+        >
+          원문 링크가 제공되지 않은 공고입니다. 정확한 내용은 소관 기관에 확인해 주세요.
+        </p>
       )}
 
       <p className={`${compact ? "mt-3 text-[11px]" : "mt-4 text-xs"} leading-relaxed text-slate-400`}>
@@ -180,31 +194,6 @@ function PolicyBlock({
         <DetailContentBody text={value} />
       </div>
     </section>
-  );
-}
-
-function ExternalAction({
-  href,
-  primary = false,
-  children,
-}: {
-  href: string;
-  primary?: boolean;
-  children: string;
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`flex h-12 min-w-0 flex-1 items-center justify-center rounded-md px-5 text-sm font-semibold ${
-        primary
-          ? "bg-primary text-white"
-          : "border border-primary bg-white text-primary"
-      }`}
-    >
-      {children}
-    </a>
   );
 }
 
