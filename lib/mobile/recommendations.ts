@@ -47,6 +47,16 @@ export interface RecommendationResult {
   needsAdditionalReview: boolean;
 }
 
+export interface NewMatchNotificationEvaluation {
+  matchedCategoryIds: number[];
+  reasons: string[];
+  score: number;
+}
+
+export type NewMatchNotificationAnnouncement = Omit<OpenAnnouncement, "status"> & {
+  status: "open" | "upcoming";
+};
+
 type FieldMatch = "match" | "conflict" | "unknown";
 
 export function recommendationCategoryIds(condition: NativeUserCondition) {
@@ -103,6 +113,52 @@ export function matchRecommendations(
     const result = evaluateRecommendation(condition, announcement);
     return result ? [result] : [];
   });
+}
+
+export function evaluateNewMatchNotificationCandidate(
+  condition: NativeUserCondition,
+  announcement: NewMatchNotificationAnnouncement,
+  includeNationwide: boolean,
+): NewMatchNotificationEvaluation | null {
+  if (
+    (announcement.status !== "open" && announcement.status !== "upcoming") ||
+    !condition.onboarding_completed
+  ) {
+    return null;
+  }
+  const interestedIds = new Set(recommendationCategoryIds(condition));
+  const matchedCategoryIds = announcement.category_ids
+    .filter((id) => interestedIds.has(id))
+    .filter((id, index, values) => values.indexOf(id) === index)
+    .sort((a, b) => a - b);
+  if (matchedCategoryIds.length === 0) return null;
+
+  const region = matchRegion(
+    condition.region,
+    announcement.region,
+    announcement.regions,
+  );
+  if (region !== "match") return null;
+  if (
+    !includeNationwide &&
+    !isNationwideUserRegion(condition.region) &&
+    isNationwideAnnouncementRegion(
+      announcement.region,
+      announcement.regions,
+    )
+  ) {
+    return null;
+  }
+  const target = matchTarget(condition.user_type, announcement.target);
+  if (target === "conflict") return null;
+
+  const reasons = ["관심 분야 일치", "지역 일치"];
+  if (target === "match") reasons.push("지원대상 일치");
+  return {
+    matchedCategoryIds,
+    reasons,
+    score: reasons.length,
+  };
 }
 
 export function filterNationwideRecommendations(

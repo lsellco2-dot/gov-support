@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   buildNotificationFeedPayload,
+  buildNewMatchNotificationFeedPayload,
   parseNotificationFeedParams,
+  queryNewMatchNotificationFeed,
   queryNotificationFeed,
 } from "@/lib/mobile/notification-feed";
 
@@ -15,6 +17,22 @@ export async function GET(request: NextRequest) {
 
   const now = new Date();
   try {
+    if (parsed.value.mode === "new_matches") {
+      const { rows, sources } = await queryNewMatchNotificationFeed(
+        parsed.value,
+        now,
+      );
+      return NextResponse.json(
+        buildNewMatchNotificationFeedPayload(
+          rows,
+          sources,
+          parsed.value,
+          request.nextUrl.origin,
+          now,
+        ),
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
     const { rows, sources } = await queryNotificationFeed(parsed.value, now);
     const payload = buildNotificationFeedPayload(
       rows,

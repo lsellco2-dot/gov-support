@@ -1,0 +1,173 @@
+[
+  {
+    "name": "exact Seoul business match",
+    "condition": {
+      "user_type": "small_business",
+      "region": "seoul",
+      "interests": ["small_business_support"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "open",
+      "category_ids": [2],
+      "region": "서울",
+      "regions": ["서울"],
+      "target": "소상공인"
+    },
+    "include_nationwide": false,
+    "eligible": true,
+    "reason_count": 3
+  },
+  {
+    "name": "nationwide excluded",
+    "condition": {
+      "user_type": "small_business",
+      "region": "seoul",
+      "interests": ["small_business_support"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "open",
+      "category_ids": [2],
+      "region": "전국",
+      "regions": ["전국"],
+      "target": "소상공인"
+    },
+    "include_nationwide": false,
+    "eligible": false,
+    "reason_count": 0
+  },
+  {
+    "name": "nationwide included",
+    "condition": {
+      "user_type": "small_business",
+      "region": "seoul",
+      "interests": ["small_business_support"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "open",
+      "category_ids": [2],
+      "region": "전국",
+      "regions": ["전국"],
+      "target": "소상공인"
+    },
+    "include_nationwide": true,
+    "eligible": true,
+    "reason_count": 3
+  },
+  {
+    "name": "Gwangju matches integrated region",
+    "condition": {
+      "user_type": "job_seeker_worker",
+      "region": "gwangju",
+      "interests": ["employment_labor_cost"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "upcoming",
+      "category_ids": [5],
+      "region": null,
+      "regions": ["전남광주통합특별시"],
+      "target": "구직자"
+    },
+    "include_nationwide": false,
+    "eligible": true,
+    "reason_count": 3
+  },
+  {
+    "name": "multi-region contains user region",
+    "condition": {
+      "user_type": "pre_startup",
+      "region": "seoul",
+      "interests": ["startup_support"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "open",
+      "category_ids": [1],
+      "region": null,
+      "regions": ["경기", "서울"],
+      "target": "예비창업자"
+    },
+    "include_nationwide": false,
+    "eligible": true,
+    "reason_count": 3
+  },
+  {
+    "name": "unknown region is too uncertain for notification",
+    "condition": {
+      "user_type": "small_business",
+      "region": "seoul",
+      "interests": ["small_business_support"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "open",
+      "category_ids": [2],
+      "region": null,
+      "regions": null,
+      "target": "소상공인"
+    },
+    "include_nationwide": true,
+    "eligible": false,
+    "reason_count": 0
+  },
+  {
+    "name": "category mismatch",
+    "condition": {
+      "user_type": "small_business",
+      "region": "seoul",
+      "interests": ["small_business_support"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "open",
+      "category_ids": [3],
+      "region": "서울",
+      "regions": ["서울"],
+      "target": "소상공인"
+    },
+    "include_nationwide": false,
+    "eligible": false,
+    "reason_count": 0
+  },
+  {
+    "name": "explicit target conflict",
+    "condition": {
+      "user_type": "small_business",
+      "region": "seoul",
+      "interests": ["employment_labor_cost"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "open",
+      "category_ids": [5],
+      "region": "서울",
+      "regions": ["서울"],
+      "target": "구직자 및 취업준비생"
+    },
+    "include_nationwide": false,
+    "eligible": false,
+    "reason_count": 0
+  },
+  {
+    "name": "closed announcement",
+    "condition": {
+      "user_type": "small_business",
+      "region": "seoul",
+      "interests": ["small_business_support"],
+      "onboarding_completed": true
+    },
+    "announcement": {
+      "status": "closed",
+      "category_ids": [2],
+      "region": "서울",
+      "regions": ["서울"],
+      "target": "소상공인"
+    },
+    "include_nationwide": false,
+    "eligible": false,
+    "reason_count": 0
+  }
+]
