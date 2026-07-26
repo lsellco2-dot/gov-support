@@ -75,6 +75,46 @@ test("stores and restores a valid recommendation result", () => {
   assert.deepEqual(readRecommendationCache(key, storage, 2_000), value);
 });
 
+test("keeps nationwide filter variants without overwriting either cache", () => {
+  const storage = memoryStorage();
+  const excludedKey = buildRecommendationCacheKey({
+    condition,
+    sort: "latest",
+    includeNationwide: false,
+  });
+  const includedKey = buildRecommendationCacheKey({
+    condition,
+    sort: "latest",
+    includeNationwide: true,
+  });
+  const excludedValue = {
+    serverVersion: "2026-07-26:100:20",
+    items: [recommendation(1)],
+    pending: [],
+    page: 1,
+    hasMoreCandidates: true,
+  };
+  const includedValue = {
+    serverVersion: "2026-07-26:100:20",
+    items: [recommendation(1), recommendation(2)],
+    pending: [recommendation(3)],
+    page: 1,
+    hasMoreCandidates: true,
+  };
+
+  writeRecommendationCache(excludedKey, excludedValue, storage, 1_000);
+  writeRecommendationCache(includedKey, includedValue, storage, 2_000);
+
+  assert.deepEqual(
+    readRecommendationCache(excludedKey, storage, 3_000),
+    excludedValue,
+  );
+  assert.deepEqual(
+    readRecommendationCache(includedKey, storage, 3_000),
+    includedValue,
+  );
+});
+
 test("rejects stale, mismatched, and damaged cache data", () => {
   const storage = memoryStorage();
   const key = buildRecommendationCacheKey({

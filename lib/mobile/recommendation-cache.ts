@@ -3,8 +3,9 @@ import type { OpenAnnouncementsSort } from "./open-announcements";
 import type { RecommendationResult } from "./recommendations";
 import type { StorageLike } from "./user-condition";
 
-const CACHE_SCHEMA_VERSION = 1;
+const CACHE_SCHEMA_VERSION = 2;
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 8;
 export const RECOMMENDATION_CACHE_STORAGE_KEY =
   "govsupport:recommendations-cache:v1";
 
@@ -16,10 +17,13 @@ export interface RecommendationCacheValue {
   hasMoreCandidates: boolean;
 }
 
-interface StoredRecommendationCache extends RecommendationCacheValue {
-  schemaVersion: number;
-  key: string;
+interface StoredRecommendationCacheEntry extends RecommendationCacheValue {
   cachedAt: number;
+}
+
+interface StoredRecommendationCacheCollection {
+  schemaVersion: number;
+  entries: Record<string, StoredRecommendationCacheEntry>;
 }
 
 export function buildRecommendationCacheKey(input: {
@@ -50,19 +54,17 @@ export function readRecommendationCache(
     const raw = storage.getItem(RECOMMENDATION_CACHE_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (
-      !isStoredCache(parsed) ||
-      parsed.key !== expectedKey ||
-      now - parsed.cachedAt > CACHE_MAX_AGE_MS
-    ) {
+    if (!isStoredCacheCollection(parsed)) {
       return null;
     }
+    const entry = parsed.entries[expectedKey];
+    if (!entry || now - entry.cachedAt > CACHE_MAX_AGE_MS) return null;
     return {
-      serverVersion: parsed.serverVersion,
-      items: parsed.items,
-      pending: parsed.pending,
-      page: parsed.page,
-      hasMoreCandidates: parsed.hasMoreCandidates,
+      serverVersion: entry.serverVersion,
+      items: entry.items,
+      pending: entry.pending,
+      page: entry.page,
+      hasMoreCandidates: entry.hasMoreCandidates,
     };
   } catch {
     return null;
@@ -77,11 +79,24 @@ export function writeRecommendationCache(
 ) {
   if (!storage) return false;
   try {
-    const stored: StoredRecommendationCache = {
-      schemaVersion: CACHE_SCHEMA_VERSION,
-      key,
+    const existing = readStoredCollection(storage);
+    const entries = Object.fromEntries(
+      Object.entries(existing?.entries ?? {}).filter(
+        ([, entry]) => now - entry.cachedAt <= CACHE_MAX_AGE_MS,
+      ),
+    );
+    entries[key] = {
       cachedAt: now,
       ...value,
+    };
+    const limitedEntries = Object.fromEntries(
+      Object.entries(entries)
+        .sort(([, a], [, b]) => b.cachedAt - a.cachedAt)
+        .slice(0, CACHE_MAX_ENTRIES),
+    );
+    const stored: StoredRecommendationCacheCollection = {
+      schemaVersion: CACHE_SCHEMA_VERSION,
+      entries: limitedEntries,
     };
     storage.setItem(RECOMMENDATION_CACHE_STORAGE_KEY, JSON.stringify(stored));
     return true;
@@ -102,11 +117,33 @@ export function clearRecommendationCache(
   }
 }
 
-function isStoredCache(value: unknown): value is StoredRecommendationCache {
+function readStoredCollection(
+  storage: StorageLike,
+): StoredRecommendationCacheCollection | null {
+  const raw = storage.getItem(RECOMMENDATION_CACHE_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return isStoredCacheCollection(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isStoredCacheCollection(
+  value: unknown,
+): value is StoredRecommendationCacheCollection {
   if (!isRecord(value)) return false;
   return (
     value.schemaVersion === CACHE_SCHEMA_VERSION &&
-    typeof value.key === "string" &&
+    isRecord(value.entries) &&
+    Object.values(value.entries).every(isStoredCacheEntry)
+  );
+}
+
+function isStoredCacheEntry(value: unknown) {
+  if (!isRecord(value)) return false;
+  return (
     typeof value.cachedAt === "number" &&
     Number.isFinite(value.cachedAt) &&
     (value.serverVersion === null ||

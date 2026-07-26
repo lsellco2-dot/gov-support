@@ -149,6 +149,23 @@ export default function AppRecommendationsPage({
         page: batch.lastPage,
         hasMoreCandidates: batch.hasMoreCandidates,
       });
+      if (
+        batch.alternate &&
+        !isNationwideUserRegion(resolution.condition.region)
+      ) {
+        const alternateCacheKey = buildRecommendationCacheKey({
+          condition: resolution.condition,
+          sort,
+          includeNationwide: batch.alternate.includeNationwide,
+        });
+        writeRecommendationCache(alternateCacheKey, {
+          serverVersion,
+          items: batch.alternate.items,
+          pending: batch.alternate.pending,
+          page: batch.alternate.lastPage,
+          hasMoreCandidates: batch.alternate.hasMoreCandidates,
+        });
+      }
     } catch {
       if (signal?.aborted) return;
       if (!restoredCache) setState("error");

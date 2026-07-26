@@ -35,6 +35,14 @@ export interface RecommendationBatchOptions {
   signal?: AbortSignal;
 }
 
+export interface RecommendationBatchVariant {
+  includeNationwide: boolean;
+  items: RecommendationResult[];
+  pending: RecommendationResult[];
+  lastPage: number;
+  hasMoreCandidates: boolean;
+}
+
 export async function loadRecommendationBatch({
   condition,
   sort,
@@ -47,6 +55,8 @@ export async function loadRecommendationBatch({
   signal,
 }: RecommendationBatchOptions) {
   const candidates = [...pending];
+  const fetchedCandidates: RecommendationResult[] = [];
+  const canBuildAlternate = currentPage === 0 && pending.length === 0;
   let lastPage = currentPage;
   let canFetchMore = hasMoreCandidates;
   const categoryIds = recommendationCategoryIds(condition);
@@ -57,13 +67,15 @@ export async function loadRecommendationBatch({
       pending: candidates.slice(batchSize),
       lastPage,
       hasMoreCandidates: false,
+      alternate: null,
     };
   }
 
   const filter: OpenAnnouncementsCandidateFilter = {
     categoryIds,
     userRegion: condition.region,
-    includeNationwide,
+    // Fetch the superset once so both nationwide filter states can share it.
+    includeNationwide: true,
   };
 
   while (candidates.length < batchSize && canFetchMore) {
@@ -74,23 +86,77 @@ export async function loadRecommendationBatch({
       filter,
       signal,
     );
-    const recommendations = filterNationwideRecommendations(
-      matchRecommendations(condition, page.data),
+    const recommendations = matchRecommendations(condition, page.data);
+    if (canBuildAlternate) {
+      appendUnique(fetchedCandidates, recommendations);
+    }
+    const visibleRecommendations = filterNationwideRecommendations(
+      recommendations,
       condition.region,
       includeNationwide,
     );
-    const seen = new Set(candidates.map(({ announcement }) => announcement.id));
-    candidates.push(
-      ...recommendations.filter(({ announcement }) => !seen.has(announcement.id)),
-    );
+    appendUnique(candidates, visibleRecommendations);
     lastPage = page.pagination.page;
     canFetchMore = page.pagination.has_more;
   }
+
+  const alternate = canBuildAlternate
+    ? buildAlternateVariant({
+        candidates: fetchedCandidates,
+        condition,
+        includeNationwide: !includeNationwide,
+        batchSize,
+        lastPage,
+        hasMoreCandidates: canFetchMore,
+      })
+    : null;
 
   return {
     items: candidates.slice(0, batchSize),
     pending: candidates.slice(batchSize),
     lastPage,
     hasMoreCandidates: canFetchMore,
+    alternate,
   };
+}
+
+function buildAlternateVariant({
+  candidates,
+  condition,
+  includeNationwide,
+  batchSize,
+  lastPage,
+  hasMoreCandidates,
+}: {
+  candidates: RecommendationResult[];
+  condition: NativeUserCondition;
+  includeNationwide: boolean;
+  batchSize: number;
+  lastPage: number;
+  hasMoreCandidates: boolean;
+}): RecommendationBatchVariant {
+  const visible = filterNationwideRecommendations(
+    candidates,
+    condition.region,
+    includeNationwide,
+  );
+  return {
+    includeNationwide,
+    items: visible.slice(0, batchSize),
+    pending: visible.slice(batchSize),
+    lastPage,
+    hasMoreCandidates,
+  };
+}
+
+function appendUnique(
+  target: RecommendationResult[],
+  additions: RecommendationResult[],
+) {
+  const seen = new Set(target.map(({ announcement }) => announcement.id));
+  for (const candidate of additions) {
+    if (seen.has(candidate.announcement.id)) continue;
+    seen.add(candidate.announcement.id);
+    target.push(candidate);
+  }
 }

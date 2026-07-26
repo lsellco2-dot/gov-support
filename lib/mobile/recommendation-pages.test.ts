@@ -57,7 +57,7 @@ test("continues past an empty filtered candidate page before showing empty state
       limit: 100,
       categories: [3],
       userRegion: "seoul",
-      includeNationwide: false,
+      includeNationwide: true,
     },
     {
       page: 2,
@@ -65,9 +65,17 @@ test("continues past an empty filtered candidate page before showing empty state
       limit: 100,
       categories: [3],
       userRegion: "seoul",
-      includeNationwide: false,
+      includeNationwide: true,
     },
   ]);
+  assert.deepEqual(
+    batch.alternate?.items.map(({ announcement: item }) => item.id),
+    [1],
+  );
+  assert.deepEqual(
+    batch.alternate?.pending.map(({ announcement: item }) => item.id),
+    [2, 3],
+  );
   assert.equal(batch.hasMoreCandidates, false);
 });
 
@@ -105,7 +113,46 @@ test("nationwide inclusion preserves the original sorted candidate order", async
   assert.deepEqual(batch.items.map(({ announcement: item }) => item.id), [1, 2]);
 });
 
-test("load more reuses deadline sort and nationwide exclusion", async () => {
+test("initial batch prepares both nationwide filter variants from one fetch", async () => {
+  let calls = 0;
+  const batch = await loadRecommendationBatch({
+    condition,
+    sort: "latest",
+    includeNationwide: false,
+    currentPage: 0,
+    hasMoreCandidates: true,
+    batchSize: 2,
+    fetchPage: async () => {
+      calls += 1;
+      return candidatePage(
+        1,
+        [
+          announcement(1, "전국"),
+          announcement(2, "서울"),
+          announcement(3, null),
+          announcement(4, "서울"),
+        ],
+        false,
+      );
+    },
+  });
+
+  assert.equal(calls, 1);
+  assert.deepEqual(
+    batch.items.map(({ announcement: item }) => item.id),
+    [2, 4],
+  );
+  assert.deepEqual(
+    batch.alternate?.items.map(({ announcement: item }) => item.id),
+    [1, 2],
+  );
+  assert.deepEqual(
+    batch.alternate?.pending.map(({ announcement: item }) => item.id),
+    [3, 4],
+  );
+});
+
+test("load more reuses deadline sort and filters nationwide candidates locally", async () => {
   const sorts: string[] = [];
   const first = await loadRecommendationBatch({
     condition,
