@@ -1,6 +1,9 @@
 import type { OpenAnnouncement } from "./recommendations";
 import type { OpenAnnouncementsSort } from "./open-announcements";
 
+const VERSION_CACHE_MS = 30_000;
+let recentVersion: { value: string; checkedAt: number } | null = null;
+
 export interface OpenAnnouncementsPage {
   data: OpenAnnouncement[];
   pagination: {
@@ -36,6 +39,31 @@ export async function fetchOpenAnnouncements(
     throw new Error("OPEN_ANNOUNCEMENTS_UNAVAILABLE");
   }
   return payload;
+}
+
+export async function fetchOpenAnnouncementsVersion(
+  signal?: AbortSignal,
+): Promise<string> {
+  const now = Date.now();
+  if (recentVersion && now - recentVersion.checkedAt < VERSION_CACHE_MS) {
+    return recentVersion.value;
+  }
+  const response = await fetch("/api/mobile/open-announcements/version", {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  const payload = await response.json().catch(() => null);
+  if (
+    !response.ok ||
+    !isRecord(payload) ||
+    typeof payload.version !== "string" ||
+    !payload.version
+  ) {
+    throw new Error("OPEN_ANNOUNCEMENTS_VERSION_UNAVAILABLE");
+  }
+  recentVersion = { value: payload.version, checkedAt: now };
+  return payload.version;
 }
 
 export function buildOpenAnnouncementsQuery(

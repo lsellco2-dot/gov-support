@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { LoaderCircle, RefreshCw, Settings, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useEffect } from "react";
 import CategoryChips from "./CategoryChips";
 import FavoriteButton from "./FavoriteButton";
@@ -13,12 +13,19 @@ import {
   openUserConditionSettings,
 } from "@/lib/mobile/app-bridge";
 import type { OpenAnnouncementsSort } from "@/lib/mobile/open-announcements";
+import { fetchOpenAnnouncementsVersion } from "@/lib/mobile/open-announcements-client";
 import {
   isNationwideUserRegion,
   type RecommendationResult,
 } from "@/lib/mobile/recommendations";
 import { announcementSourceLabel } from "@/lib/mobile/announcement-source";
 import { loadRecommendationBatch } from "@/lib/mobile/recommendation-pages";
+import {
+  buildRecommendationCacheKey,
+  clearRecommendationCache,
+  readRecommendationCache,
+  writeRecommendationCache,
+} from "@/lib/mobile/recommendation-cache";
 import {
   resolveUserCondition,
   type UserConditionSource,
@@ -58,9 +65,11 @@ export default function AppRecommendationsPage({
   const [sort, setSort] = useState<OpenAnnouncementsSort>("latest");
   const [includeNationwide, setIncludeNationwide] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const cacheKeyRef = useRef<string | null>(null);
+  const serverVersionRef = useRef<string | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
-    setState("loading");
+    let restoredCache = false;
     try {
       const resolution = await resolveUserCondition();
       if (signal?.aborted) return;
@@ -80,6 +89,41 @@ export default function AppRecommendationsPage({
         return;
       }
       setConditionSource(resolution.source);
+      const cacheKey = buildRecommendationCacheKey({
+        condition: resolution.condition,
+        sort,
+        includeNationwide,
+      });
+      cacheKeyRef.current = cacheKey;
+      const cached = readRecommendationCache(cacheKey);
+      if (cached) {
+        restoredCache = true;
+        serverVersionRef.current = cached.serverVersion;
+        setCondition(resolution.condition);
+        setItems(cached.items);
+        setPendingItems(cached.pending);
+        setPage(cached.page);
+        setHasMoreCandidates(cached.hasMoreCandidates);
+        setState("ready");
+
+        const latestVersion = await fetchOpenAnnouncementsVersion(signal).catch(
+          () => null,
+        );
+        if (
+          signal?.aborted ||
+          !latestVersion ||
+          latestVersion === cached.serverVersion
+        ) {
+          return;
+        }
+        serverVersionRef.current = latestVersion;
+      } else {
+        setState("loading");
+      }
+
+      const versionPromise = restoredCache
+        ? Promise.resolve(serverVersionRef.current)
+        : fetchOpenAnnouncementsVersion(signal).catch(() => null);
       const batch = await loadRecommendationBatch({
         condition: resolution.condition,
         sort,
@@ -89,15 +133,25 @@ export default function AppRecommendationsPage({
         signal,
       });
       if (signal?.aborted) return;
+      const serverVersion = await versionPromise;
+      if (signal?.aborted) return;
       setCondition(resolution.condition);
       setItems(batch.items);
       setPendingItems(batch.pending);
       setPage(batch.lastPage);
       setHasMoreCandidates(batch.hasMoreCandidates);
       setState("ready");
+      serverVersionRef.current = serverVersion;
+      writeRecommendationCache(cacheKey, {
+        serverVersion,
+        items: batch.items,
+        pending: batch.pending,
+        page: batch.lastPage,
+        hasMoreCandidates: batch.hasMoreCandidates,
+      });
     } catch {
       if (signal?.aborted) return;
-      setState("error");
+      if (!restoredCache) setState("error");
     }
   }, [includeNationwide, sort]);
 
@@ -108,12 +162,22 @@ export default function AppRecommendationsPage({
   }, [load]);
 
   useEffect(() => {
-    const reload = () => void load();
-    window.addEventListener("focus", reload);
-    window.addEventListener(USER_CONDITION_CHANGED_EVENT, reload);
+    const revalidate = () => void load();
+    const reloadForConditionChange = () => {
+      clearRecommendationCache();
+      void load();
+    };
+    window.addEventListener("focus", revalidate);
+    window.addEventListener(
+      USER_CONDITION_CHANGED_EVENT,
+      reloadForConditionChange,
+    );
     return () => {
-      window.removeEventListener("focus", reload);
-      window.removeEventListener(USER_CONDITION_CHANGED_EVENT, reload);
+      window.removeEventListener("focus", revalidate);
+      window.removeEventListener(
+        USER_CONDITION_CHANGED_EVENT,
+        reloadForConditionChange,
+      );
     };
   }, [load]);
 
@@ -130,15 +194,29 @@ export default function AppRecommendationsPage({
         hasMoreCandidates,
         pending: pendingItems,
       });
-      setItems((current) => [
-        ...current,
+      const nextItems = [
+        ...items,
         ...batch.items.filter(
-          (candidate) => !current.some((item) => item.announcement.id === candidate.announcement.id),
+          (candidate) =>
+            !items.some(
+              (item) =>
+                item.announcement.id === candidate.announcement.id,
+            ),
         ),
-      ]);
+      ];
+      setItems(nextItems);
       setPendingItems(batch.pending);
       setPage(batch.lastPage);
       setHasMoreCandidates(batch.hasMoreCandidates);
+      if (cacheKeyRef.current) {
+        writeRecommendationCache(cacheKeyRef.current, {
+          serverVersion: serverVersionRef.current,
+          items: nextItems,
+          pending: batch.pending,
+          page: batch.lastPage,
+          hasMoreCandidates: batch.hasMoreCandidates,
+        });
+      }
     } catch {
       setState("error");
     } finally {
