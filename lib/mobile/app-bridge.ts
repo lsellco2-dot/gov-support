@@ -5,6 +5,10 @@ import {
 
 export const APP_BRIDGE_NAME = "GovSupportApp" as const;
 export const FAVORITES_CHANGED_EVENT = "govsupport:favorites-changed" as const;
+export const APP_AUTH_CODE_AVAILABLE_EVENT =
+  "govsupport:auth-code-available" as const;
+export const APP_AUTH_CALLBACK_URL =
+  "kr.co.govsupport.assistant://auth/callback" as const;
 
 export type AppPlatform = "android" | "ios";
 export type BridgeAvailability = "available" | "browser" | "outdated";
@@ -56,6 +60,9 @@ interface NativeAppBridge {
   getUserCondition?: () => BridgeReturn;
   openAppSettings?: () => BridgeReturn;
   openUserConditionSettings?: () => BridgeReturn;
+  openAuth?: (authorizationUrl: string) => BridgeReturn;
+  getPendingAuthCode?: () => BridgeReturn;
+  clearPendingAuthCode?: (code: string) => BridgeReturn;
 }
 
 declare global {
@@ -92,6 +99,14 @@ export function getAppSettingsBridgeAvailability(): BridgeAvailability {
 
 export function getUserConditionSettingsBridgeAvailability(): BridgeAvailability {
   return bridgeAvailability(["openUserConditionSettings"]);
+}
+
+export function getAuthBridgeAvailability(): BridgeAvailability {
+  return bridgeAvailability([
+    "openAuth",
+    "getPendingAuthCode",
+    "clearPendingAuthCode",
+  ]);
 }
 
 export function isAppBridgeAvailable() {
@@ -169,6 +184,35 @@ export async function openUserConditionSettings(): Promise<NativeResult<boolean>
     return invalidBridgeResponse();
   }
   return { success: true, data: true };
+}
+
+export async function openAppAuth(
+  authorizationUrl: string,
+): Promise<NativeResult<boolean>> {
+  const result = await callNativeResult<unknown>("openAuth", [authorizationUrl]);
+  if (!result.success) return result;
+  if (!isRecord(result.data) || result.data.opened !== true) {
+    return invalidBridgeResponse();
+  }
+  return { success: true, data: true };
+}
+
+export async function getPendingAuthCode(): Promise<NativeResult<string | null>> {
+  const result = await callNativeResult<unknown>("getPendingAuthCode", []);
+  if (!result.success) return result;
+  if (!isRecord(result.data)) return invalidBridgeResponse();
+  if (result.data.code === null) return { success: true, data: null };
+  const code = normalizeAuthCode(result.data.code);
+  return code === null ? invalidBridgeResponse() : { success: true, data: code };
+}
+
+export async function clearPendingAuthCode(code: string): Promise<NativeResult<boolean>> {
+  const result = await callNativeResult<unknown>("clearPendingAuthCode", [code]);
+  if (!result.success) return result;
+  if (!isRecord(result.data) || typeof result.data.cleared !== "boolean") {
+    return invalidBridgeResponse();
+  }
+  return { success: true, data: result.data.cleared };
 }
 
 function bridgeAvailability(methods: readonly (keyof NativeAppBridge)[]): BridgeAvailability {
@@ -293,6 +337,15 @@ function normalizeCategoryIds(value: unknown): number[] {
 
 function nullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeAuthCode(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const code = value.trim();
+  if (code.length < 16 || code.length > 2048 || /[\u0000-\u001f\u007f]/.test(code)) {
+    return null;
+  }
+  return code;
 }
 
 function isRecord(value: unknown): value is Record<string, any> {

@@ -2,15 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   addFavorite,
+  clearPendingAuthCode,
   getAppInstallationContext,
+  getAuthBridgeAvailability,
   getFavorites,
   getFavoritesBridgeAvailability,
   getAppSettingsBridgeAvailability,
   getRecommendationsBridgeAvailability,
   getUserConditionSettingsBridgeAvailability,
+  getPendingAuthCode,
   isAppBridgeAvailable,
   isFavorite,
   openAppSettings,
+  openAppAuth,
   openUserConditionSettings,
   removeFavorite,
 } from "./app-bridge";
@@ -21,6 +25,7 @@ test("distinguishes browser and outdated app bridges", async () => {
   assert.equal(getAppSettingsBridgeAvailability(), "browser");
   assert.equal(getUserConditionSettingsBridgeAvailability(), "browser");
   assert.equal(getRecommendationsBridgeAvailability(), "browser");
+  assert.equal(getAuthBridgeAvailability(), "browser");
   assert.equal(isAppBridgeAvailable(), false);
   assert.equal(await getAppInstallationContext(), null);
 
@@ -29,6 +34,7 @@ test("distinguishes browser and outdated app bridges", async () => {
   assert.equal(getAppSettingsBridgeAvailability(), "outdated");
   assert.equal(getUserConditionSettingsBridgeAvailability(), "outdated");
   assert.equal(getRecommendationsBridgeAvailability(), "outdated");
+  assert.equal(getAuthBridgeAvailability(), "outdated");
   clearWindow();
 });
 
@@ -59,6 +65,9 @@ test("keeps legacy installation context and parses favorite methods", async () =
     }),
     openAppSettings: async () => success({ opened: true }),
     openUserConditionSettings: async () => success({ opened: true }),
+    openAuth: async () => success({ opened: true }),
+    getPendingAuthCode: async () => success({ code: "c".repeat(48) }),
+    clearPendingAuthCode: async () => success({ cleared: true }),
   });
 
   assert.equal(isAppBridgeAvailable(), true);
@@ -68,6 +77,19 @@ test("keeps legacy installation context and parses favorite methods", async () =
   assert.deepEqual(await removeFavorite(1), { success: true, data: true });
   assert.deepEqual(await openAppSettings(), { success: true, data: true });
   assert.deepEqual(await openUserConditionSettings(), { success: true, data: true });
+  assert.equal(getAuthBridgeAvailability(), "available");
+  assert.deepEqual(await openAppAuth("https://example.com"), {
+    success: true,
+    data: true,
+  });
+  assert.deepEqual(await getPendingAuthCode(), {
+    success: true,
+    data: "c".repeat(48),
+  });
+  assert.deepEqual(await clearPendingAuthCode("c".repeat(48)), {
+    success: true,
+    data: true,
+  });
 
   const added = await addFavorite({
     id: 1,
