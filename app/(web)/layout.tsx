@@ -1,6 +1,22 @@
+import AuthControl from "@/components/AuthControl";
+import { createAuthServerClient } from "@/lib/supabase/auth-server";
 import Link from "next/link";
 
-export default function WebLayout({ children }: { children: React.ReactNode }) {
+export default async function WebLayout({ children }: { children: React.ReactNode }) {
+  const supabase = createAuthServerClient();
+  const { data } = supabase ? await supabase.auth.getClaims() : { data: null };
+  const claims = data?.claims;
+  const userMetadata = claims?.user_metadata as
+    | { full_name?: string; name?: string }
+    | undefined;
+  const user = claims
+    ? {
+        email: typeof claims.email === "string" ? claims.email : null,
+        // Metadata is display-only and is never used for authorization.
+        displayName: userMetadata?.full_name ?? userMetadata?.name ?? null,
+      }
+    : null;
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-line bg-white">
@@ -9,9 +25,12 @@ export default function WebLayout({ children }: { children: React.ReactNode }) {
             <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-sm text-white">정</span>
             정부지원AI비서
           </Link>
-          <span className="hidden text-xs text-subtle sm:inline">
-            중기부 · 창진원 · 행안부 · 과기부 공고 통합조회
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="hidden text-xs text-subtle lg:inline">
+              중기부 · 창진원 · 행안부 · 과기부 공고 통합조회
+            </span>
+            <AuthControl user={user} />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
