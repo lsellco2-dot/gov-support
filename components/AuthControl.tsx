@@ -3,6 +3,7 @@
 import { LoaderCircle, LogIn, LogOut, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import LoginModal from "@/components/LoginModal";
 import {
   APP_AUTH_CALLBACK_URL,
   APP_AUTH_CODE_AVAILABLE_EVENT,
@@ -25,6 +26,7 @@ export default function AuthControl({ user, compact = false }: AuthControlProps)
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   const completeAppSignIn = useCallback(async () => {
     if (getAuthBridgeAvailability() !== "available") return;
@@ -62,6 +64,10 @@ export default function AuthControl({ user, compact = false }: AuthControlProps)
       window.removeEventListener(APP_AUTH_CODE_AVAILABLE_EVENT, handleCodeAvailable);
   }, [completeAppSignIn, user]);
 
+  useEffect(() => {
+    if (user) setLoginOpen(false);
+  }, [user]);
+
   async function signIn() {
     if (pending) return;
     const supabase = createAuthBrowserClient();
@@ -89,6 +95,8 @@ export default function AuthControl({ user, compact = false }: AuthControlProps)
       const opened = await openAppAuth(data.url);
       if (!opened.success) {
         setError("Google 로그인 화면을 열지 못했습니다.");
+      } else {
+        setLoginOpen(false);
       }
       setPending(false);
       return;
@@ -135,12 +143,17 @@ export default function AuthControl({ user, compact = false }: AuthControlProps)
       <div className="relative">
         <button
           type="button"
-          onClick={signIn}
+          onClick={() => {
+            setError(null);
+            setLoginOpen(true);
+          }}
           disabled={pending}
           className={`flex items-center justify-center rounded-md border border-line bg-white font-semibold text-ink hover:border-primary hover:text-primary disabled:opacity-60 ${
             compact ? "h-9 px-2 text-xs" : "h-10 px-2 text-sm sm:px-3"
           }`}
-          aria-label="Google 로그인"
+          aria-label="로그인"
+          aria-haspopup="dialog"
+          aria-expanded={loginOpen}
         >
           {pending ? (
             <LoaderCircle className={`animate-spin ${compact ? "mr-1" : "sm:mr-2"}`} size={17} aria-hidden="true" />
@@ -148,14 +161,16 @@ export default function AuthControl({ user, compact = false }: AuthControlProps)
             <LogIn className={compact ? "mr-1" : "sm:mr-2"} size={17} aria-hidden="true" />
           )}
           <span className={compact ? "inline" : "hidden sm:inline"}>
-            {compact ? "로그인" : "Google 로그인"}
+            로그인
           </span>
         </button>
-        {error && (
-          <p className="absolute right-0 top-11 z-10 w-56 rounded-md border border-urgent bg-white px-3 py-2 text-xs text-urgent shadow-sm" role="alert">
-            {error}
-          </p>
-        )}
+        <LoginModal
+          open={loginOpen}
+          pending={pending}
+          error={error}
+          onClose={() => setLoginOpen(false)}
+          onGoogleSignIn={() => void signIn()}
+        />
       </div>
     );
   }
