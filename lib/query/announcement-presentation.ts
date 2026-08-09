@@ -44,6 +44,10 @@ const POLICY_DOMAIN_LABELS: Record<PolicyDomain, string> = {
   participation_infrastructure: "참여·기반",
 };
 
+export const POLICY_DOMAIN_OPTIONS = (
+  Object.entries(POLICY_DOMAIN_LABELS) as [PolicyDomain, string][]
+).map(([value, label]) => ({ value, label }));
+
 export function policyDomainLabel(value: string | null | undefined) {
   return value && value in POLICY_DOMAIN_LABELS
     ? POLICY_DOMAIN_LABELS[value as PolicyDomain]

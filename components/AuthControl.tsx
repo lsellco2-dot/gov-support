@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { LoaderCircle, LogIn, LogOut, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -20,9 +21,14 @@ interface AuthControlProps {
     displayName: string | null;
   } | null;
   compact?: boolean;
+  isAdmin?: boolean;
 }
 
-export default function AuthControl({ user, compact = false }: AuthControlProps) {
+export default function AuthControl({
+  user,
+  compact = false,
+  isAdmin = false,
+}: AuthControlProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -181,6 +187,14 @@ export default function AuthControl({ user, compact = false }: AuthControlProps)
         <UserRound className="mr-2 shrink-0 text-primary" size={18} aria-hidden="true" />
         {user.displayName || user.email || "로그인 사용자"}
       </span>
+      {isAdmin && !compact && (
+        <Link
+          href="/admin"
+          className="flex h-10 items-center rounded-md border border-primary px-3 text-sm font-semibold text-primary hover:bg-primary-light"
+        >
+          관리자
+        </Link>
+      )}
       <button
         type="button"
         onClick={signOut}

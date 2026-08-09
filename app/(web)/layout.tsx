@@ -1,19 +1,13 @@
 import AuthControl from "@/components/AuthControl";
-import { createAuthServerClient } from "@/lib/supabase/auth-server";
+import { getCurrentAdminAccess } from "@/lib/admin/auth";
 import Link from "next/link";
 
 export default async function WebLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createAuthServerClient();
-  const { data } = supabase ? await supabase.auth.getClaims() : { data: null };
-  const claims = data?.claims;
-  const userMetadata = claims?.user_metadata as
-    | { full_name?: string; name?: string }
-    | undefined;
-  const user = claims
+  const adminAccess = await getCurrentAdminAccess();
+  const user = adminAccess.user
     ? {
-        email: typeof claims.email === "string" ? claims.email : null,
-        // Metadata is display-only and is never used for authorization.
-        displayName: userMetadata?.full_name ?? userMetadata?.name ?? null,
+        email: adminAccess.user.email,
+        displayName: adminAccess.user.displayName,
       }
     : null;
 
@@ -29,7 +23,10 @@ export default async function WebLayout({ children }: { children: React.ReactNod
             <span className="hidden text-xs text-subtle lg:inline">
               중기부 · 창진원 · 행안부 · 과기부 공고 통합조회
             </span>
-            <AuthControl user={user} />
+            <AuthControl
+              user={user}
+              isAdmin={adminAccess.status === "authorized"}
+            />
           </div>
         </div>
       </header>
