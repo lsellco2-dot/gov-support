@@ -17,6 +17,7 @@
     "backfill:youthcenter:details": "tsx scripts/backfill-youthcenter-details.ts"
   },
   "dependencies": {
+    "@google/genai": "2.16.0",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "^2.45.0",
     "cheerio": "1.0.0",

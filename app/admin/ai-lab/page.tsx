@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import AiLabClient from "@/components/admin/AiLabClient";
+import { getGeminiAnalysisAvailability } from "@/lib/admin/ai-analysis/gemini-config";
 import { requireAdminPage } from "@/lib/admin/auth";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 
 export default async function AiLabPage() {
   const access = await requireAdminPage("/admin/ai-lab");
+  const gemini = getGeminiAnalysisAvailability();
   return (
     <main className="min-h-screen bg-[var(--bg)] px-3 py-5 sm:px-4 sm:py-8">
       <div className="mx-auto max-w-6xl">
@@ -29,7 +31,7 @@ export default async function AiLabPage() {
             관리자 · {access.user.email ?? access.user.displayName ?? "Google 사용자"}
           </p>
         </header>
-        <AiLabClient />
+        <AiLabClient gemini={gemini} />
       </div>
     </main>
   );

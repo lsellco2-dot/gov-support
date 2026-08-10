@@ -3,13 +3,29 @@
 import Link from "next/link";
 import {
   ArrowDown,
+  Bot,
+  CheckCircle2,
+  CircleHelp,
   ExternalLink,
   FlaskConical,
   LoaderCircle,
   Search,
+  ShieldCheck,
   Sparkles,
+  XCircle,
 } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { GRANT_ANALYSIS_CLASSIFICATION_META } from "@/lib/admin/ai-analysis/classification";
+import {
+  GRANT_ANALYSIS_CLASSIFICATIONS,
+  MAX_GRANT_ANALYSIS_CANDIDATES,
+  type GrantAnalysisClassification,
+  type GrantAnalysisErrorResponse,
+  type GrantAnalysisEvaluation,
+  type GrantAnalysisResponse,
+  type GrantAnalysisSafetyRule,
+  type GeminiAnalysisAvailability,
+} from "@/lib/admin/ai-analysis/types";
 import {
   AI_LAB_CANDIDATE_LIMITS,
   type AiLabSearchInput,
@@ -47,7 +63,11 @@ const INITIAL_FORM: FormState = {
   sort: "score",
 };
 
-export default function AiLabClient() {
+export default function AiLabClient({
+  gemini,
+}: {
+  gemini: GeminiAnalysisAvailability;
+}) {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [result, setResult] = useState<AiLabSearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -298,16 +318,7 @@ export default function AiLabClient() {
           </p>
         )}
 
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            disabled
-            title="LLM 연결 후 사용 가능"
-            className="flex h-12 items-center justify-center rounded-md border border-line bg-slate-100 px-5 text-sm font-semibold text-subtle opacity-70"
-          >
-            <Sparkles className="mr-2" size={18} aria-hidden="true" />
-            AI 심층분석 · LLM 연결 후 사용 가능
-          </button>
+        <div className="mt-6 flex justify-end">
           <button
             type="submit"
             disabled={loading || form.profile.interests.length === 0}
@@ -323,9 +334,572 @@ export default function AiLabClient() {
         </div>
       </form>
 
-      {result && <SearchResults result={result} />}
+      {result && (
+        <>
+          <SearchResults result={result} />
+          <AiAnalysisPanel
+            key={`${result.metrics.total_ms}-${result.candidates.map(({ id }) => id).join("-")}`}
+            searchResult={result}
+            gemini={gemini}
+          />
+        </>
+      )}
     </div>
   );
+}
+
+type AnalysisProviderSelection = "unconfigured" | "mock" | "gemini";
+
+function AiAnalysisPanel({
+  searchResult,
+  gemini,
+}: {
+  searchResult: AiLabSearchResponse;
+  gemini: GeminiAnalysisAvailability;
+}) {
+  const [provider, setProvider] =
+    useState<AnalysisProviderSelection>("unconfigured");
+  const [analysis, setAnalysis] = useState<GrantAnalysisResponse | null>(null);
+  const [evaluations, setEvaluations] = useState<
+    Record<number, GrantAnalysisEvaluation>
+  >({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<GrantAnalysisErrorResponse | null>(null);
+  const candidateIds = searchResult.candidates
+    .slice(0, MAX_GRANT_ANALYSIS_CANDIDATES)
+    .map(({ id }) => id);
+  const providerConfigured =
+    provider === "mock" || (provider === "gemini" && gemini.configured);
+  const model =
+    provider === "mock"
+      ? "deterministic-ui-v1"
+      : provider === "gemini"
+        ? gemini.model
+        : "미설정";
+  const billing =
+    provider === "mock"
+      ? "해당 없음"
+      : provider === "gemini"
+        ? gemini.billingTier === "free"
+          ? "Free Tier"
+          : "Paid Tier"
+        : "미설정";
+
+  async function analyze() {
+    if (!providerConfigured || loading || candidateIds.length === 0) return;
+    setLoading(true);
+    setError(null);
+    setAnalysis(null);
+    setEvaluations({});
+    try {
+      const response = await fetch("/api/admin/ai-lab/analyze", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          provider,
+          search: searchResult.input,
+          candidate_ids: candidateIds,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | GrantAnalysisResponse
+        | GrantAnalysisErrorResponse
+        | null;
+      if (!response.ok || !payload || !("results" in payload)) {
+        setError(
+          payload && "error" in payload
+            ? payload
+            : { error: "AI 정밀분석을 실행하지 못했습니다." },
+        );
+        return;
+      }
+      setAnalysis(payload);
+    } catch (caught) {
+      setError({
+        error:
+          caught instanceof Error && caught.message
+            ? caught.message
+            : "AI 정밀분석을 실행하지 못했습니다.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section
+      aria-labelledby="ai-analysis-title"
+      className="border-y border-line bg-white py-5 sm:rounded-lg sm:border sm:p-6"
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary-light text-primary">
+          <Bot size={20} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 id="ai-analysis-title" className="text-lg font-bold text-ink">
+            AI 정밀분석
+          </h2>
+          <p className="mt-1 text-sm leading-relaxed text-subtle">
+            AISUP 후보만 대상으로 A/B/C/제외 판정 흐름을 검증합니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ReadOnlyField
+          label="후보 공고"
+          value={`${candidateIds.length}건${searchResult.candidates.length > MAX_GRANT_ANALYSIS_CANDIDATES ? " (상위 20건)" : ""}`}
+        />
+        <div>
+          <label htmlFor="ai-analysis-provider" className="text-xs font-semibold text-subtle">
+            LLM Provider
+          </label>
+          <select
+            id="ai-analysis-provider"
+            value={provider}
+            onChange={(event) => {
+              setProvider(event.target.value as AnalysisProviderSelection);
+              setAnalysis(null);
+              setEvaluations({});
+              setError(null);
+            }}
+            className="mt-2 h-11 w-full rounded-md border border-line bg-white px-3 text-sm font-semibold text-ink focus:border-primary"
+          >
+            <option value="unconfigured">미설정</option>
+            <option value="mock">Mock · 개발 검증</option>
+            <option value="gemini" disabled={!gemini.configured}>
+              {gemini.configured
+                ? `Gemini · ${gemini.billingTier === "free" ? "Free Tier" : "Paid Tier"}`
+                : "Gemini · API 키 미설정"}
+            </option>
+          </select>
+        </div>
+        <ReadOnlyField label="Model" value={model} />
+        <ReadOnlyField label="Billing" value={billing} />
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-relaxed text-subtle">
+          {providerNotice(provider, gemini.configured)}
+        </p>
+        <button
+          type="button"
+          disabled={!providerConfigured || loading || candidateIds.length === 0}
+          onClick={analyze}
+          className="flex h-12 shrink-0 items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-subtle"
+        >
+          {loading ? (
+            <LoaderCircle className="mr-2 animate-spin" size={18} aria-hidden="true" />
+          ) : (
+            <Sparkles className="mr-2" size={18} aria-hidden="true" />
+          )}
+          {loading ? "분석 중" : "정밀분석 실행"}
+        </button>
+      </div>
+
+      {provider === "gemini" && (
+        <p className="mt-3 rounded-md border border-line bg-primary-light px-3 py-2 text-xs leading-relaxed text-subtle">
+          Free Tier 기술실험에는 이름·연락처·이메일·사업자번호·실제 비공개 사업계획을 입력하지 말고 가상 프로필만 사용하세요.
+        </p>
+      )}
+
+      {error && (
+        <GeminiErrorPanel error={error} />
+      )}
+
+      <AnalysisMetrics response={analysis} candidateCount={candidateIds.length} />
+      {analysis && (
+        <AnalysisResults
+          response={analysis}
+          candidates={searchResult.candidates}
+          evaluations={evaluations}
+          onEvaluate={(announcementId, evaluation) =>
+            setEvaluations((current) => ({
+              ...current,
+              [announcementId]: evaluation,
+            }))
+          }
+        />
+      )}
+    </section>
+  );
+}
+
+function GeminiErrorPanel({ error }: { error: GrantAnalysisErrorResponse }) {
+  const diagnostics = error.diagnostics;
+  return (
+    <div
+      className="mt-4 rounded-md border border-urgent bg-red-50 px-4 py-3 text-sm text-urgent"
+      role="alert"
+    >
+      <p className="font-bold">Gemini 분석 실패</p>
+      <p className="mt-1 leading-relaxed">{error.error}</p>
+      {diagnostics && (
+        <dl className="mt-3 grid gap-x-4 gap-y-1 border-t border-red-200 pt-3 text-xs sm:grid-cols-[auto_1fr]">
+          <dt className="font-semibold">HTTP</dt>
+          <dd>{diagnostics.httpStatus ?? "확인 불가"}</dd>
+          <dt className="font-semibold">Code</dt>
+          <dd className="break-all">{diagnostics.googleCode}</dd>
+          <dt className="font-semibold">Name</dt>
+          <dd className="break-all">{diagnostics.errorName}</dd>
+          <dt className="font-semibold">Message</dt>
+          <dd className="break-words">{diagnostics.safeMessage}</dd>
+          <dt className="font-semibold">실패 시간</dt>
+          <dd>{diagnostics.durationMs.toLocaleString()}ms</dd>
+        </dl>
+      )}
+      {error.batch && (
+        <p className="mt-3 border-t border-red-200 pt-3 text-xs font-semibold">
+          성공 {error.batch.successfulBatches}개 · 실패 Batch {error.batch.failedBatch}
+          /{error.batch.totalBatches} · 구성 {error.batch.batchSizes.join(" / ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AnalysisMetrics({
+  response,
+  candidateCount,
+}: {
+  response: GrantAnalysisResponse | null;
+  candidateCount: number;
+}) {
+  const cost = response ? formatCost(response) : "-";
+  const metrics = [
+    ["후보 공고", `${candidateCount}건`],
+    ["API 호출", response ? `${response.apiCalls}회` : "-"],
+    ["Batch 구성", response?.batchSizes?.length ? response.batchSizes.join(" / ") : "-"],
+    ["입력 토큰", response ? response.inputTokens.toLocaleString() : "-"],
+    ["출력 토큰", response ? response.outputTokens.toLocaleString() : "-"],
+    ["Thinking", response ? response.thinkingTokens.toLocaleString() : "-"],
+    ["전체 토큰", response ? response.totalTokens.toLocaleString() : "-"],
+    ["Provider 시간", response ? `${response.durationMs.toLocaleString()}ms` : "-"],
+    ["전체 요청", response ? `${response.totalDurationMs.toLocaleString()}ms` : "-"],
+    ["예상 비용", cost],
+  ];
+  return (
+    <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3 xl:grid-cols-10">
+      {metrics.map(([label, value]) => (
+        <div key={label} className="min-w-0 bg-white px-3 py-3 text-center">
+          <p className="text-[11px] text-subtle">{label}</p>
+          <p className="mt-1 break-words text-sm font-bold text-ink">{value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AnalysisResults({
+  response,
+  candidates,
+  evaluations,
+  onEvaluate,
+}: {
+  response: GrantAnalysisResponse;
+  candidates: AiLabSearchResponse["candidates"];
+  evaluations: Record<number, GrantAnalysisEvaluation>;
+  onEvaluate: (announcementId: number, value: GrantAnalysisEvaluation) => void;
+}) {
+  const [active, setActive] =
+    useState<GrantAnalysisClassification>("A");
+  const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  const activeResults = response.results.filter(
+    ({ classification }) => classification === active,
+  );
+
+  return (
+    <div className="mt-6 border-t border-line pt-5">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 className="text-base font-bold text-ink">분석 결과</h3>
+          <p className="mt-1 text-xs text-subtle">
+            {response.provider} · {response.model} · {billingTierLabel(response.billingTier)}
+          </p>
+        </div>
+        <p className="text-xs text-subtle">모든 판정은 공식 원문 확인이 필요합니다.</p>
+      </div>
+
+      <div
+        role="tablist"
+        aria-label="AI 판정 분류"
+        className="mt-4 flex overflow-x-auto border-b border-line"
+      >
+        {GRANT_ANALYSIS_CLASSIFICATIONS.map((classification) => {
+          const meta = GRANT_ANALYSIS_CLASSIFICATION_META[classification];
+          const count = response.results.filter(
+            (item) => item.classification === classification,
+          ).length;
+          return (
+            <button
+              key={classification}
+              type="button"
+              role="tab"
+              aria-selected={active === classification}
+              onClick={() => setActive(classification)}
+              className={`min-h-12 min-w-max border-b-2 px-3 text-xs font-semibold sm:px-4 ${
+                active === classification
+                  ? "border-primary text-primary"
+                  : "border-transparent text-subtle"
+              }`}
+            >
+              {meta.label} · {meta.description} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      <div role="tabpanel" className="mt-4 space-y-3">
+        {activeResults.length === 0 ? (
+          <p className="border-y border-dashed border-line py-8 text-center text-sm text-subtle sm:rounded-lg sm:border">
+            이 분류에 해당하는 결과가 없습니다.
+          </p>
+        ) : (
+          activeResults.flatMap((item) => {
+            const candidate = candidateById.get(item.announcementId);
+            if (!candidate) return [];
+            return [
+              <article key={item.announcementId} className="rounded-lg border border-line p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-primary">
+                      기존 AISUP 추천점수 · {candidate.score}점
+                    </p>
+                    <h4 className="mt-1 break-words text-base font-bold leading-snug text-ink">
+                      {candidate.title}
+                    </h4>
+                  </div>
+                  <ClassificationBadge
+                    classification={item.classification}
+                    confidence={item.confidence}
+                  />
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-3 text-xs">
+                  <span className="font-semibold text-subtle">
+                    Gemini 원시 · {item.rawClassification ?? item.classification}
+                    {" "}· {Math.round((item.rawConfidence ?? item.confidence) * 100)}%
+                  </span>
+                  <span className="font-semibold text-ink">
+                    최종 · {item.classification} · {Math.round(item.confidence * 100)}%
+                  </span>
+                  <span className={item.serverAdjusted ? "font-bold text-urgent" : "font-semibold text-open"}>
+                    {item.serverAdjusted ? "서버 보정됨" : "서버 보정 없음"}
+                  </span>
+                </div>
+                {item.safetyRules && item.safetyRules.length > 0 && (
+                  <p className="mt-2 text-xs leading-relaxed text-subtle">
+                    적용 규칙 · {item.safetyRules.map(safetyRuleLabel).join(" · ")}
+                  </p>
+                )}
+
+                {item.requiresVerification && (
+                  <p className="mt-3 flex items-start text-xs font-semibold text-urgent">
+                    <ShieldCheck className="mr-1.5 mt-0.5 shrink-0" size={15} aria-hidden="true" />
+                    확인 필요 · 신청 전 공식 원문과 운영기관 확인이 필요합니다.
+                  </p>
+                )}
+
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <AnalysisList label="판정 이유" items={item.reasons} />
+                  <AnalysisList
+                    label="근거"
+                    items={item.evidence}
+                    empty="확인 가능한 근거 없음"
+                  />
+                  <AnalysisList
+                    label="부족한 조건"
+                    items={item.missingConditions}
+                    empty="추가로 식별된 조건 없음"
+                  />
+                  <AnalysisList
+                    label="확인 필요사항"
+                    items={item.cautions}
+                    empty="별도 주의사항 없음"
+                  />
+                </div>
+
+                <div className="mt-5 flex flex-col gap-3 border-t border-line pt-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-1" aria-label="관리자 평가">
+                    <EvaluationButton
+                      label="정확"
+                      icon={CheckCircle2}
+                      selected={evaluations[item.announcementId] === "accurate"}
+                      onClick={() => onEvaluate(item.announcementId, "accurate")}
+                    />
+                    <EvaluationButton
+                      label="틀림"
+                      icon={XCircle}
+                      selected={evaluations[item.announcementId] === "incorrect"}
+                      onClick={() => onEvaluate(item.announcementId, "incorrect")}
+                    />
+                    <EvaluationButton
+                      label="애매"
+                      icon={CircleHelp}
+                      selected={evaluations[item.announcementId] === "ambiguous"}
+                      onClick={() => onEvaluate(item.announcementId, "ambiguous")}
+                    />
+                  </div>
+                  {candidate.original_url ? (
+                    <a
+                      href={candidate.original_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex h-11 items-center justify-center rounded-md border border-primary px-4 text-sm font-semibold text-primary"
+                    >
+                      공식 원문 보기
+                      <ExternalLink className="ml-2" size={16} aria-hidden="true" />
+                    </a>
+                  ) : (
+                    <span className="text-xs font-semibold text-subtle">공식 원문 링크 확인 필요</span>
+                  )}
+                </div>
+              </article>,
+            ];
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-subtle">{label}</p>
+      <p className="mt-2 flex min-h-11 items-center rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-ink">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function ClassificationBadge({
+  classification,
+  confidence,
+}: {
+  classification: GrantAnalysisClassification;
+  confidence: number;
+}) {
+  const meta = GRANT_ANALYSIS_CLASSIFICATION_META[classification];
+  const style = {
+    A: "border-green-200 bg-green-50 text-open",
+    B: "border-blue-200 bg-primary-light text-primary-dark",
+    C: "border-amber-200 bg-amber-50 text-amber-800",
+    EXCLUDE: "border-red-200 bg-red-50 text-urgent",
+  }[classification];
+  return (
+    <span className={`shrink-0 rounded-badge border px-2.5 py-1.5 text-xs font-bold ${style}`}>
+      {meta.label} · {meta.description} · {Math.round(confidence * 100)}%
+    </span>
+  );
+}
+
+function AnalysisList({
+  label,
+  items,
+  empty = "정보 없음",
+}: {
+  label: string;
+  items: string[];
+  empty?: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-bold text-ink">{label}</p>
+      {items.length > 0 ? (
+        <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-subtle">
+          {items.map((item) => (
+            <li key={item} className="break-words">· {item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1.5 text-xs text-subtle">{empty}</p>
+      )}
+    </div>
+  );
+}
+
+function EvaluationButton({
+  label,
+  icon: Icon,
+  selected,
+  onClick,
+}: {
+  label: string;
+  icon: typeof CheckCircle2;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`flex min-h-11 items-center rounded-md border px-3 text-xs font-semibold ${
+        selected
+          ? "border-primary bg-primary-light text-primary-dark"
+          : "border-line bg-white text-subtle"
+      }`}
+    >
+      <Icon className="mr-1.5" size={16} aria-hidden="true" />
+      {label}
+    </button>
+  );
+}
+
+function formatCost(response: GrantAnalysisResponse) {
+  if (response.billingTier === "free" && response.provider === "gemini") {
+    return "$0.00 · Free Tier";
+  }
+  const { amount, currency } = response.estimatedCost;
+  if (currency === "KRW") return `${amount.toLocaleString("ko-KR")}원`;
+  const formatted = `$${amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  })}`;
+  return response.billingTier === "paid" ? `${formatted} · Paid Tier` : formatted;
+}
+
+function providerNotice(
+  provider: AnalysisProviderSelection,
+  geminiConfigured: boolean,
+) {
+  if (provider === "mock") {
+    return "Mock Provider는 외부 API를 호출하지 않으며 결과는 실제 신청 가능성을 의미하지 않습니다.";
+  }
+  if (provider === "gemini") {
+    return geminiConfigured
+      ? "Gemini는 AISUP DB 후보만 분석하며, 최대 7건 단위로 나누어 한 번에 처리합니다."
+      : "Gemini · API 키 미설정";
+  }
+  return geminiConfigured
+    ? "Mock 또는 Gemini Provider를 선택해 정밀분석을 실행하세요."
+    : "Gemini · API 키 미설정";
+}
+
+function safetyRuleLabel(rule: GrantAnalysisSafetyRule) {
+  if (rule === "evidence_required_downgrade") return "근거 없는 강한 판정 완화";
+  if (rule === "eligibility_mismatch_enforced") return "구조화 자격조건 불일치 반영";
+  if (rule === "eligibility_unknown_requires_review") return "구조화 자격조건 확인 필요";
+  if (rule === "eligibility_unverified_exclude_to_b") return "근거 없는 제외 판정 완화";
+  if (rule === "unresolved_condition_exclude_to_b") return "미확인 조건 제외 방지";
+  if (rule === "region_metadata_not_eligibility") return "지역 메타데이터 자격 오해 방지";
+  if (rule === "missing_profile_condition_exclude_to_b") {
+    return "미입력 자격조건 제외 방지";
+  }
+  if (rule === "unsupported_announcement_condition_removed") {
+    return "공고에 없는 조건 제거";
+  }
+  return "한국어가 아닌 설명 제거";
+}
+
+function billingTierLabel(value: GrantAnalysisResponse["billingTier"]) {
+  if (value === "free") return "Free Tier";
+  if (value === "paid") return "Paid Tier";
+  return "비용 체계 없음";
 }
 
 function SearchResults({ result }: { result: AiLabSearchResponse }) {
