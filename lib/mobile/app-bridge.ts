@@ -318,7 +318,7 @@ function isProductionDetailUrl(value: string, id: number): boolean {
     const url = new URL(value);
     return (
       url.protocol === "https:" &&
-      url.hostname === "gov-support-nine.vercel.app" &&
+      PRODUCTION_DETAIL_HOSTS.has(url.hostname.toLowerCase()) &&
       (url.port === "" || url.port === "443") &&
       (url.pathname === `/app/announcements/${id}` || url.pathname === `/app/announcements/${id}/`) &&
       !url.search &&
@@ -328,6 +328,11 @@ function isProductionDetailUrl(value: string, id: number): boolean {
     return false;
   }
 }
+
+const PRODUCTION_DETAIL_HOSTS = new Set([
+  "aisup.co.kr",
+  "gov-support-nine.vercel.app",
+]);
 
 function normalizeCategoryIds(value: unknown): number[] {
   if (!Array.isArray(value)) return [];

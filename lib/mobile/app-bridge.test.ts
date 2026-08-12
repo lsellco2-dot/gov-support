@@ -110,11 +110,25 @@ test("keeps legacy installation context and parses favorite methods", async () =
   clearWindow();
 });
 
+test("loads favorites saved with the custom or legacy production host", async () => {
+  setWindow({
+    getFavorites: async () => success([
+      favorite(1, "aisup.co.kr"),
+      favorite(2, "gov-support-nine.vercel.app"),
+    ]),
+  }, "https://aisup.co.kr");
+
+  const result = await getFavorites();
+  assert.equal(result.success, true);
+  if (result.success) assert.deepEqual(result.data.map((item) => item.id), [1, 2]);
+  clearWindow();
+});
+
 function success(data: unknown) {
   return JSON.stringify({ success: true, data });
 }
 
-function favorite(id: number) {
+function favorite(id: number, host = "gov-support-nine.vercel.app") {
   return {
     id,
     title: "공고",
@@ -123,18 +137,21 @@ function favorite(id: number) {
     region: "전국",
     status: "open",
     apply_end: "2026-08-31",
-    detail_url: `https://gov-support-nine.vercel.app/app/announcements/${id}`,
+    detail_url: `https://${host}/app/announcements/${id}`,
     original_url: null,
     favorited_at: 100,
   };
 }
 
-function setWindow(bridge: Record<string, unknown>) {
+function setWindow(
+  bridge: Record<string, unknown>,
+  origin = "https://gov-support-nine.vercel.app",
+) {
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: {
       GovSupportApp: bridge,
-      location: { origin: "https://gov-support-nine.vercel.app" },
+      location: { origin },
     },
   });
 }
