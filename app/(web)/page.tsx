@@ -1,7 +1,11 @@
 import AudienceEntryCards from "@/components/AudienceEntryCards";
+import type { Metadata } from "next";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 // 첫 접속 화면 = 큰 카테고리 선택형 랜딩. 카드 클릭 시 /announcements 목록으로 진입.
 export default function HomePage() {

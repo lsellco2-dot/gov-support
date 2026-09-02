@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import AnnouncementCard from "@/components/AnnouncementCard";
 import AudienceEntryCards from "@/components/AudienceEntryCards";
@@ -8,6 +9,12 @@ import { listAnnouncements, type AudienceGroup } from "@/lib/query/announcements
 import { canonicalPageUrl } from "@/lib/query/pagination";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "정부지원사업 공고",
+  description:
+    "창업, 소상공인, 취업, 청년 지원사업 공고를 분야·지역·모집상태별로 검색하세요.",
+  alternates: { canonical: "/announcements" },
+};
 
 type SP = Record<string, string | undefined>;
 

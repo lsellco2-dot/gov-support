@@ -1,7 +1,12 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import AppBottomNav from "@/components/AppBottomNav";
 import AuthControl from "@/components/AuthControl";
 import { createAuthServerClient } from "@/lib/supabase/auth-server";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 // Android WebView가 로드하는 모바일 전용 레이아웃
 export default async function AppLayout({ children }: { children: React.ReactNode }) {

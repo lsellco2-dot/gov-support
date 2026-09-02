@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import DDayBadge from "@/components/DDayBadge";
 import CategoryChips from "@/components/CategoryChips";
 import LeadForm from "@/components/LeadForm";
@@ -13,12 +15,42 @@ import {
 } from "@/components/YouthCenterPolicyDetail";
 import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
 
+const getCachedAnnouncement = cache(getAnnouncement);
+
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}): Promise<Metadata> {
+  const id = Number(params.id);
+  if (!Number.isInteger(id)) return { robots: { index: false, follow: false } };
+
+  const item = await getCachedAnnouncement(id);
+  if (!item) return { robots: { index: false, follow: false } };
+
+  const description =
+    item.summary?.slice(0, 160) ||
+    [item.organization, item.target, item.support_type].filter(Boolean).join(" · ");
+
+  return {
+    title: item.title,
+    description: description || "정부지원사업 공고 상세정보를 확인하세요.",
+    alternates: { canonical: `/announcements/${item.id}` },
+    openGraph: {
+      type: "article",
+      title: item.title,
+      description: description || "정부지원사업 공고 상세정보를 확인하세요.",
+      url: `/announcements/${item.id}`,
+    },
+  };
+}
 
 export default async function DetailPage({ params }: { params: { id: string } }) {
   const id = Number(params.id);
   if (!Number.isInteger(id)) notFound();
-  const item = await getAnnouncement(id);
+  const item = await getCachedAnnouncement(id);
   if (!item) notFound();
   const isYouthCenter = isYouthCenterSource(item.source_code);
   const hasDetailedInfo = Boolean(
