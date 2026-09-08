@@ -1,4 +1,12 @@
 {
+  "headers": [
+    {
+      "source": "/legal/mobile-pet/:path*",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }
+      ]
+    }
+  ],
   "crons": [
     { "path": "/api/ingest", "schedule": "0 21 * * *" },
     { "path": "/api/ingest/youthcenter", "schedule": "0 22 * * *" }
