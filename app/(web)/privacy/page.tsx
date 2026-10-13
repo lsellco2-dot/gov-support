@@ -98,12 +98,16 @@ export default function PrivacyPage() {
           제공받을 수 있습니다. 광고와 판매 상품은 정부 공고·공식 추천이 아니며,
           광고 이용 여부는 공고 조회나 지원사업 선정과 관계가 없습니다.
           <PolicyLink href="https://privacy.coupang.com/ko/center/coupang/">쿠팡 개인정보처리방침</PolicyLink></p>
-        <p className="mt-3"><strong>Google 광고 도입 안내:</strong> 웹 AdSense와 앱 AdMob은
-          연결·심사 준비 단계입니다. 광고가 활성화되는 경우 광고 제공·측정·부정 이용
-          방지를 위해 Google이 쿠키, IP 주소, 기기 식별자, 광고 상호작용·진단 정보를
-          처리할 수 있습니다. 실제 적용 전 필요한 동의 화면과 개인정보 선택 기능,
-          앱 스토어의 데이터 안내를 함께 반영합니다. 계정 등록이나 인증 파일 게시만으로
-          모든 화면에서 광고가 실행되는 것은 아닙니다.</p>
+        <p className="mt-3"><strong>Android 앱 Google AdMob:</strong> 광고가 활성화된 앱
+          버전의 공고 목록에서 배너가 표시될 수 있습니다. Google 광고 SDK는 광고 제공,
+          측정 및 부정 이용 방지를 위해 IP 주소와 이를 통한 대략적 위치, 광고 ID 등
+          기기 식별자, 앱·광고 상호작용 및 진단 정보를 처리하고 공유할 수 있습니다.
+          필요한 지역에서는 동의 화면을 제공하며, 앱 설정의 광고 개인정보 선택에서
+          제공되는 선택지를 다시 확인할 수 있습니다. 광고 ID는 Android 설정에서도
+          관리할 수 있습니다. 광고 동의 조회나 로딩이 실패해도 공고 조회는 이용할 수 있습니다.</p>
+        <p className="mt-3"><strong>웹 AdSense:</strong> 현재 사이트 심사 단계이며
+          AdSense 광고 코드는 활성화하지 않았습니다. 앱 광고와 별개로 도입 여부와
+          필요한 선택 기능을 안내합니다.</p>
         <p className="mt-3">사용자가 입력한 지원조건을 광고 맞춤 타기팅에 사용하지 않습니다.
           Google의 정보 처리와 선택 방법은
           <PolicyLink href="https://policies.google.com/technologies/partner-sites?hl=ko">Google 파트너 사이트 안내</PolicyLink>와
