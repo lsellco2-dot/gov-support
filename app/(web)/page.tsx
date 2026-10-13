@@ -1,4 +1,5 @@
 import AudienceEntryCards from "@/components/AudienceEntryCards";
+import CoupangAffiliateBanner from "@/components/CoupangAffiliateBanner";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -39,6 +40,7 @@ export default function HomePage() {
           <AudienceEntryCards basePath="/announcements" active="all" params={{}} variant="landing" />
         </div>
       </section>
+      <CoupangAffiliateBanner />
     </div>
   );
 }
