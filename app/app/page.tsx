@@ -1,12 +1,13 @@
 import AudienceEntryCards from "@/components/AudienceEntryCards";
 import AppSettingsEntry from "@/components/AppSettingsEntry";
+import { nativeBannerAttributes } from "@/lib/mobile/native-banner";
 
 export const dynamic = "force-dynamic";
 
 // 모바일 WebView 첫 화면 = 랜딩. 카드 클릭 시 /app/announcements 목록으로 진입.
 export default function AppHome() {
   return (
-    <div>
+    <div {...nativeBannerAttributes("/app", "ready")}>
       <AppSettingsEntry />
 
       <section className="mt-6">

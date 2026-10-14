@@ -25,6 +25,7 @@ import {
   YouthPolicyRegion,
 } from "./AnnouncementPolicyMeta";
 import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
+import { nativeBannerAttributes } from "@/lib/mobile/native-banner";
 
 type State = "loading" | "browser" | "outdated" | "empty" | "ready" | "error";
 
@@ -104,7 +105,7 @@ export default function AppFavoritesPage() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" {...nativeBannerAttributes("/app/favorites", state, items.length)}>
       <div className="flex items-center justify-end gap-2">
         <label htmlFor="favorite-sort" className="text-xs font-semibold text-subtle">
           정렬

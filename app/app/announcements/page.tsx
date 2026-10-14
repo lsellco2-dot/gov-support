@@ -6,6 +6,7 @@ import FilterBar from "@/components/FilterBar";
 import Pagination from "@/components/Pagination";
 import { listAnnouncements, type AudienceGroup } from "@/lib/query/announcements";
 import { canonicalPageUrl } from "@/lib/query/pagination";
+import { nativeBannerAttributes } from "@/lib/mobile/native-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,7 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
       <p className="mt-3 text-xs text-subtle">
         모집중 <b className="text-ink tabular-nums">{total.toLocaleString()}</b>건 · 최신 등록순
       </p>
-      <div className="mt-2 space-y-2.5" data-native-banner-ready={items.length >= 4 ? "true" : "false"}>
+      <div className="mt-2 space-y-2.5" {...nativeBannerAttributes("/app/announcements", "ready", items.length)}>
         {items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-subtle">
             조건에 맞는 공고가 없습니다.

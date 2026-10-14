@@ -39,6 +39,7 @@ import {
   YouthPolicyRegion,
 } from "./AnnouncementPolicyMeta";
 import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
+import { nativeBannerAttributes } from "@/lib/mobile/native-banner";
 
 type State = "loading" | "outdated" | "ready" | "error" | "no-condition";
 
@@ -276,7 +277,9 @@ export default function AppRecommendationsPage({
   }
 
   return (
-    <div>
+    <div {...(detailBasePath === "/app/announcements"
+      ? nativeBannerAttributes("/app/recommendations", state, items.length)
+      : {})}>
       {notice && (
         <p
           className="mb-3 rounded-md border border-open bg-green-50 px-3 py-2 text-sm font-semibold text-open"
