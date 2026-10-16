@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { bokjiCentral, bokjiLocal } from "./bokji";
-import { enara } from "./enara";
+import { enara, fetchEnaraText } from "./enara";
 import { culture, parseCultureList } from "./culture";
 import { explicitRegion, fetchPublicText, parseServiceXml } from "./public-service";
 import { runIngest, toRow } from "../run";
@@ -76,6 +76,26 @@ test("공공 API 본문 수신 timeout도 키/URL 없는 안전 오류로 기록
   });
   await assert.rejects(fetchPublicText("https://example.com", 45_000), { message: "PUBLIC_SOURCE_NETWORK_ERROR" });
   assert.equal(calls, 1);
+});
+
+test("e나라도움만 일시 통신 오류를 2회 재시도하고 인증/할당량은 반복하지 않는다", async t => {
+  t.mock.method(console, "warn", () => {});
+  let attempts = 0;
+  const waits: number[] = [];
+  const result = await fetchEnaraText("fixture", async (_, timeout) => {
+    assert.equal(timeout, 45_000);
+    attempts++;
+    if (attempts < 3) throw new Error("PUBLIC_SOURCE_NETWORK_ERROR");
+    return "ok";
+  }, async ms => { waits.push(ms); });
+  assert.equal(result, "ok");
+  assert.equal(attempts, 3);
+  assert.deepEqual(waits, [2000, 4000]);
+  for (const code of ["PUBLIC_SOURCE_HTTP_401", "PUBLIC_SOURCE_HTTP_429", "PUBLIC_SOURCE_API_REJECTED", "PUBLIC_SOURCE_NETWORK_ERROR"]) {
+    let calls = 0;
+    await assert.rejects(fetchEnaraText("fixture", async () => { calls++; throw Error(code); }, async () => {}));
+    assert.equal(calls, code.endsWith("NETWORK_ERROR") ? 3 : 1);
+  }
 });
 const grant = {
   PBLANC_NM: "비영리단체 공익활동 공모", PBLANC_POPUP_URL: "https://www.bojo.go.kr/call?id=example",

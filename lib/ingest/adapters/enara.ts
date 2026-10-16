@@ -3,6 +3,23 @@ import type { SourceAdapter } from "../types";
 import { buildUrl, toDate } from "./util";
 import { apiDetail, checkPageProgress, fetchPublicText, parseServiceXml, serviceText, unwrapServiceCdata } from "./public-service";
 
+export async function fetchEnaraText(
+  url: string,
+  request = fetchPublicText,
+  wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)),
+): Promise<string> {
+  for (let attempt = 0; ; attempt++) {
+    try { return await request(url, 45_000); }
+    catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      // 조회 GET의 일시 장애만 최대 2회 재시도. 인증/할당량/스키마 오류는 즉시 중단.
+      if (attempt >= 2 || !/^PUBLIC_SOURCE_(NETWORK_ERROR|HTTP_50[234])$/.test(code)) throw error;
+      console.warn(`[enara] 원천 통신 재시도 ${attempt + 1}/2: ${code}`);
+      await wait((attempt + 1) * 2_000);
+    }
+  }
+}
+
 // 종합 API에는 일반 보조사업도 포함된다. 공고명 필터로 공모 연결 행만 요청한다.
 export const enara: SourceAdapter = {
   sourceCode: "enara", name: "e나라도움 국고보조금 공모사업",
@@ -20,9 +37,12 @@ export const enara: SourceAdapter = {
           serviceKey, pageNo: page, numOfRows: 500, resultType: "xml", bsnsyear: businessYear, pblanc_nm: "%",
         });
         // 장시간 CLI 전용. 해외 runner에서 원천 응답 본문 수신까지 15초를 넘길 수 있다.
-        const { items, total } = parseServiceXml(await fetchPublicText(url, 45_000), "item");
+        const { items, total } = parseServiceXml(await fetchEnaraText(url), "item");
         checkPageProgress(items, total, collected);
         collected += items.length;
+        if (page % 10 === 0 || collected >= total) {
+          console.log(JSON.stringify({ source: "enara", year: businessYear, page, collected, total }));
+        }
         const calls: typeof items = [];
         for (const item of items) {
           if (!item.PBLANC_NM || !item.PBLANC_POPUP_URL) throw new Error("ENARA_CALL_FILTER_INVALID");
