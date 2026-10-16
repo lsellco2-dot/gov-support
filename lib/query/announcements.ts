@@ -1,5 +1,8 @@
 import { supabaseAnon } from "@/lib/supabase/anon";
 import { FIXTURES } from "./fixtures";
+import { keywordFilters, matchesTerms, searchTerms, topicKeywords } from "./discovery";
+import { readWithTimeoutRetry } from "./read-retry";
+import { matchesAge, normalizeAge } from "./age";
 import { sanitizeDisplayRow, sanitizeDisplayText } from "@/lib/text/sanitize";
 import { normalizeMsitAttachmentProxyUrl } from "@/lib/ingest/msit-attachments";
 import {
@@ -22,6 +25,9 @@ const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "true";
 
 export interface ListParams {
   q?: string;
+  topic?: string;
+  age?: number;
+  ageKnownOnly?: boolean;
   audience?: AudienceGroup;
   category?: number;
   categoryIds?: number[];
@@ -36,7 +42,11 @@ export interface ListParams {
   size?: number;
 }
 
-export type AudienceGroup = "all" | "business" | "worker";
+export type AudienceGroup = "all" | "business" | "worker" | "nonprofit" | "community";
+
+export function normalizeAudience(value?: string | null): AudienceGroup {
+  return value === "business" || value === "worker" || value === "nonprofit" || value === "community" ? value : "all";
+}
 
 export interface AnnouncementRow extends AnnouncementPresentationFields {
   id: number;
@@ -111,8 +121,11 @@ export const REGIONS = [
 
 const DEFAULT_SIZE = 10;
 const MAX_SIZE = 100;
+const LIST_COLUMNS = "id,source_id,title,organization,category_ids,region,target,support_type,summary,apply_start,apply_end,detail_url,status,created_at,regions";
 
 const AUDIENCE_KEYWORDS: Record<Exclude<AudienceGroup, "all">, string[]> = {
+  nonprofit: ["비영리", "공익단체", "민간단체", "복지단체", "사회복지법인", "사회복지시설", "시민단체", "봉사단체"],
+  community: ["동아리", "동호회", "주민모임", "주민 모임", "주민공동체", "마을공동체", "스포츠클럽", "생활체육"],
   business: [
     "예비창업",
     "창업",
@@ -153,15 +166,19 @@ function listFromFixtures(p: ListParams, page: number, size: number) {
   if (p.audience && p.audience !== "all") {
     rows = rows.filter((r) =>
       matchesAudience(
-        [r.title, r.target, r.support_type, r.summary].filter(Boolean).join(" "),
+        (p.audience === "nonprofit" || p.audience === "community"
+          ? [r.title, r.target]
+          : [r.title, r.target, r.support_type, r.summary]).filter(Boolean).join(" "),
         p.audience!
       )
     );
   }
-  if (p.q) {
-    const needle = p.q.toLowerCase();
-    rows = rows.filter((r) => r.title.toLowerCase().includes(needle));
-  }
+  rows = rows.filter((r) =>
+    matchesTerms([r.title, r.organization, r.target, r.support_type, r.summary].filter(Boolean).join(" "), searchTerms(p.q)) &&
+    matchesTerms([r.title, r.target, r.support_type, r.summary].filter(Boolean).join(" "), topicKeywords(p.topic)),
+  );
+  const age = normalizeAge(p.age);
+  if (age !== undefined) rows = rows.filter((row) => matchesAge(row, age, !!p.ageKnownOnly));
   if (p.categoryIds?.length) {
     const categoryIds = new Set(p.categoryIds);
     rows = rows.filter((r) => r.category_ids.some((id) => categoryIds.has(id)));
@@ -217,6 +234,7 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
   const size = Math.min(MAX_SIZE, positiveInt(p.size, DEFAULT_SIZE));
   const from = (page - 1) * size;
   const sort = p.sort === "deadline" ? "deadline" : "latest";
+  const age = normalizeAge(p.age);
 
   if (USE_MOCK) {
     const result = listFromFixtures(p, page, size);
@@ -227,13 +245,17 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
   let q = supabaseAnon
     .from("announcements_public")
     .select(
-      "id,source_id,title,organization,category_ids,region,target,support_type,summary,apply_start,apply_end,detail_url,status,created_at,regions",
-      { count: "exact" }
+      age === undefined ? LIST_COLUMNS : "id,target,age_min,age_max",
+      age === undefined ? { count: "exact" } : {}
     );
 
   const status = p.status ?? "open";
   if (status !== "all") q = q.eq("status", status);
   q = applyTextSearch(q, p.q);
+  const topics = topicKeywords(p.topic);
+  if (topics.length) {
+    q = q.or(keywordFilters(topics, ["title", "target", "support_type", "summary"]).join(","));
+  }
   q = applyAudienceFilter(q, p.audience);
   if (p.categoryIds?.length) {
     q = q.overlaps("category_ids", p.categoryIds);
@@ -261,10 +283,32 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
       .order("id", { ascending: false });
   } else {
     // 기본: 마감 임박순 (상시=null은 뒤로)
-    q = q.order("apply_end", { ascending: true, nullsFirst: false });
+    q = q.order("apply_end", { ascending: true, nullsFirst: false }).order("id", { ascending: false });
   }
 
-  const { data, count, error } = await q.range(from, from + size - 1);
+  if (age !== undefined) {
+    // Check lightweight eligibility rows first; fetch card content only for the selected page.
+    if (p.ageKnownOnly) q = q.or('age_min.not.is.null,age_max.not.is.null,target.imatch."[0-9]+[[:space:]]*세|연령|나이"');
+    const matching: number[] = [];
+    const batchSize = 1000;
+    for (let offset = 0; ; offset += batchSize) {
+      const batch = await readWithTimeoutRetry(() => q.range(offset, offset + batchSize - 1));
+      if (batch.error) throw new Error(batch.error.message);
+      const rows = (batch.data ?? []) as unknown as Array<{ id: number; target: string | null; age_min: number | null; age_max: number | null }>;
+      matching.push(...rows.filter((row) => matchesAge({ ...row, target: sanitizeDisplayText(row.target) }, age, !!p.ageKnownOnly)).map(row => row.id));
+      if (rows.length < batchSize) break;
+    }
+    const finalPage = Math.min(page, Math.max(1, Math.ceil(matching.length / size)));
+    const ids = matching.slice((finalPage - 1) * size, finalPage * size);
+    if (!ids.length) return { items: [], total: matching.length, page: finalPage, size };
+    const selected = await readWithTimeoutRetry(() => supabaseAnon.from("announcements_public").select(LIST_COLUMNS).in("id", ids));
+    if (selected.error) throw new Error(selected.error.message);
+    const byId = new Map(((selected.data ?? []) as unknown as AnnouncementRow[]).map(row => [row.id, sanitizeDisplayRow(row)]));
+    const items = await enrichAnnouncementRows(ids.flatMap(id => byId.has(id) ? [byId.get(id)!] : []));
+    return { items, total: matching.length, page: finalPage, size };
+  }
+
+  const { data, count, error } = await readWithTimeoutRetry(() => q.range(from, from + size - 1));
   if (error) {
     if (page > 1 && error.code === "PGRST103") {
       return listAnnouncements({ ...p, page: 1, size });
@@ -290,35 +334,40 @@ export async function listAnnouncements(p: ListParams): Promise<AnnouncementList
 
 function matchesAudience(text: string, audience: AudienceGroup) {
   if (audience === "all") return true;
-  const keywords = AUDIENCE_KEYWORDS[audience];
+  const keywords = AUDIENCE_KEYWORDS[audience] ?? [];
   const haystack = text.toLowerCase();
   return keywords.some((keyword) => haystack.includes(keyword.toLowerCase()));
 }
 
 function applyTextSearch<T extends { or: (filters: string) => T }>(query: T, value?: string) {
-  const term = ilikeTerm(value);
-  if (!term) return query;
-  return query.or(searchFilters(term).join(","));
+  const terms = searchTerms(value);
+  if (!terms.length) return query;
+  if (terms.length > 1) return query.or(keywordFilters(terms, ["title", "organization", "target", "support_type", "summary"]).join(","));
+  return query.or(terms.flatMap((term) => searchFilters(`%${term}%`)).join(","));
 }
 
 function applyAudienceFilter<T extends { or: (filters: string) => T }>(
   query: T,
   audience?: AudienceGroup
 ) {
-  if (!audience || audience === "all") return query;
+  if (!audience || audience === "all" || !AUDIENCE_KEYWORDS[audience]) return query;
 
   const filters = AUDIENCE_KEYWORDS[audience].flatMap((keyword) => {
     const term = ilikeTerm(keyword);
-    return term ? searchFilters(term) : [];
+    if (!term) return [];
+    // 본문에 관련 기관/활동이 언급됐다는 이유만으로 신청 대상을 단체로 분류하지 않는다.
+    return audience === "nonprofit" || audience === "community"
+      ? [`title.ilike.${term}`, `target.ilike.${term}`]
+      : searchFilters(term);
   });
 
   return filters.length > 0 ? query.or(filters.join(",")) : query;
 }
 
-function searchFilters(term: string) {
+function searchFilters(term: string, includeOrganization = true) {
   return [
     `title.ilike.${term}`,
-    `organization.ilike.${term}`,
+    ...(includeOrganization ? [`organization.ilike.${term}`] : []),
     `target.ilike.${term}`,
     `support_type.ilike.${term}`,
     `summary.ilike.${term}`,

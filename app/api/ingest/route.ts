@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/ingest/cron-auth";
 import { purgeExpiredAnnouncements, runIngest } from "@/lib/ingest/run";
+import { expandedAdapters } from "@/lib/ingest/adapters/expanded";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ async function handle(req: NextRequest) {
   }
   try {
     const source = req.nextUrl.searchParams.get("source"); // ?source=bizinfo
+    if (source?.split(",").some(code => expandedAdapters.some(adapter => adapter.sourceCode === code && adapter.requiresLongRunningJob))) {
+      return NextResponse.json({ error: "이 출처는 장시간 수집이 필요합니다. 승인된 서버에서 ingest:expanded 명령을 사용하세요." }, { status: 400 });
+    }
     const results = await runIngest(source ? source.split(",") : undefined);
     const cleanup = await purgeExpiredAnnouncements();
     const ok =

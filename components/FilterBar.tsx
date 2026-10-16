@@ -1,4 +1,5 @@
 import { CATEGORIES, REGIONS } from "@/lib/query/announcements";
+import { SUPPORT_TOPICS } from "@/lib/query/discovery";
 
 // GET 폼 기반 필터: JS 없이 동작 → WebView에서도 안정적
 export default function FilterBar({
@@ -6,7 +7,7 @@ export default function FilterBar({
   defaults,
 }: {
   action: string;
-  defaults: { q?: string; audience?: string; category?: string; region?: string; status?: string; sort?: string };
+  defaults: { q?: string; audience?: string; category?: string; topic?: string; age?: string; ageKnownOnly?: string; region?: string; status?: string; sort?: string };
 }) {
   const selectClass =
     "h-11 max-w-full rounded-lg border border-line bg-white px-3 text-sm text-ink focus:border-primary";
@@ -24,13 +25,13 @@ export default function FilterBar({
           <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle">
             🔍
           </span>
-          <label htmlFor="q" className="sr-only">공고명 검색</label>
+          <label htmlFor="q" className="sr-only">공고 검색</label>
           <input
             id="q"
             type="search"
             name="q"
             defaultValue={defaults.q ?? ""}
-            placeholder="공고명 검색 (예: 스마트공장)"
+            placeholder="공고 검색 (예: 사무실 지원, 스마트공장)"
             className="h-11 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-sm text-ink focus:border-primary"
           />
         </div>
@@ -44,6 +45,13 @@ export default function FilterBar({
 
       {/* 보조 필터 */}
       <div className="mt-3 flex flex-wrap gap-2">
+        <label htmlFor="topic" className="sr-only">지원 목적</label>
+        <select id="topic" name="topic" defaultValue={defaults.topic ?? ""} className={selectClass}>
+          <option value="">전체 지원 목적</option>
+          {SUPPORT_TOPICS.map((topic) => (
+            <option key={topic.value} value={topic.value}>{topic.label}</option>
+          ))}
+        </select>
         <label htmlFor="category" className="sr-only">지원분야</label>
         <select id="category" name="category" defaultValue={defaults.category ?? ""} className={selectClass}>
           <option value="">전체 분야</option>
@@ -69,6 +77,18 @@ export default function FilterBar({
           <option value="latest">최신 등록순</option>
           <option value="deadline">마감 임박순</option>
         </select>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <label htmlFor="age" className="flex items-center gap-2 text-sm text-subtle">
+          만 나이
+          <input id="age" name="age" type="number" min="0" max="120" step="1" defaultValue={defaults.age ?? ""}
+            className="h-11 w-20 rounded-lg border border-line px-3 text-ink focus:border-primary" />
+          세
+        </label>
+        <label className="flex items-center gap-2 text-sm text-subtle">
+          <input name="ageKnownOnly" type="checkbox" value="1" defaultChecked={defaults.ageKnownOnly === "1"} className="h-4 w-4 accent-primary" />
+          연령 미확인 공고 제외
+        </label>
       </div>
     </form>
   );

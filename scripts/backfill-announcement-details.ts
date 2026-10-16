@@ -28,10 +28,10 @@ interface Options {
   limit: number;
 }
 
-const sourceEntries = adapters.map((adapter) => ({
-  adapter,
-  sourceId: SOURCE_ID[adapter.sourceCode],
-}));
+const sourceEntries = adapters.flatMap((adapter) => {
+  const sourceId = SOURCE_ID[adapter.sourceCode];
+  return sourceId === undefined ? [] : [{ adapter, sourceId }];
+});
 const supportedSourceIds = sourceEntries.map(({ sourceId }) => sourceId);
 
 async function main() {

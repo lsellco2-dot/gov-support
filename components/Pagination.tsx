@@ -113,6 +113,7 @@ function PageLink({
   return (
     <Link
       href={href}
+      prefetch={false}
       className={className}
       aria-label={label}
       aria-current={active ? "page" : undefined}

@@ -4,7 +4,8 @@ import AnnouncementCard from "@/components/AnnouncementCard";
 import AudienceEntryCards from "@/components/AudienceEntryCards";
 import FilterBar from "@/components/FilterBar";
 import Pagination from "@/components/Pagination";
-import { listAnnouncements, type AudienceGroup } from "@/lib/query/announcements";
+import { listAnnouncements, normalizeAudience } from "@/lib/query/announcements";
+import { normalizeAge } from "@/lib/query/age";
 import { canonicalPageUrl } from "@/lib/query/pagination";
 import { nativeBannerAttributes } from "@/lib/mobile/native-banner";
 
@@ -16,6 +17,9 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
   const audience = normalizeAudience(searchParams.audience);
   const { items, total, page, size } = await listAnnouncements({
     q: searchParams.q,
+    topic: searchParams.topic,
+    age: normalizeAge(searchParams.age),
+    ageKnownOnly: searchParams.ageKnownOnly === "1",
     audience,
     category: searchParams.category ? Number(searchParams.category) : undefined,
     region: searchParams.region,
@@ -41,7 +45,8 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
       </div>
 
       <p className="mt-3 text-xs text-subtle">
-        모집중 <b className="text-ink tabular-nums">{total.toLocaleString()}</b>건 · 최신 등록순
+        {searchParams.status === "all" ? "전체" : searchParams.status === "closed" ? "마감" : "모집중"}{" "}
+        <b className="text-ink tabular-nums">{total.toLocaleString()}</b>건 · {searchParams.sort === "deadline" ? "마감 임박순" : "최신 등록순"}
       </p>
       <div className="mt-2 space-y-2.5" {...nativeBannerAttributes("/app/announcements", "ready", items.length)}>
         {items.length === 0 ? (
@@ -57,8 +62,4 @@ export default async function AppAnnouncementsPage({ searchParams }: { searchPar
       <Pagination page={page} size={size} total={total} basePath="/app/announcements" params={searchParams} />
     </div>
   );
-}
-
-function normalizeAudience(value: string | undefined): AudienceGroup {
-  return value === "business" || value === "worker" || value === "all" ? value : "all";
 }

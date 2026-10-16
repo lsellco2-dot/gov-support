@@ -21,8 +21,8 @@ export default function AnnouncementCard({
 }) {
   return (
     <article className="flex h-full min-w-0 flex-col rounded-lg border border-line bg-white p-5 transition hover:border-primary hover:shadow-[0_2px_12px_rgba(37,110,244,0.1)]">
-      <Link href={`${basePath}/announcements/${item.id}`} className="min-w-0">
-        {isYouthCenterSource(item.source_code) && (
+      <Link href={`${basePath}/announcements/${item.id}`} prefetch={false} className="min-w-0">
+        {item.source_code && (
           <div className="mb-2">
             <AnnouncementSourceBadge
               sourceCode={item.source_code}

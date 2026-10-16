@@ -5,7 +5,8 @@ import AnnouncementCard from "@/components/AnnouncementCard";
 import AudienceEntryCards from "@/components/AudienceEntryCards";
 import FilterBar from "@/components/FilterBar";
 import Pagination from "@/components/Pagination";
-import { listAnnouncements, type AudienceGroup } from "@/lib/query/announcements";
+import { listAnnouncements, normalizeAudience } from "@/lib/query/announcements";
+import { normalizeAge } from "@/lib/query/age";
 import { canonicalPageUrl } from "@/lib/query/pagination";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,9 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
   const audience = normalizeAudience(searchParams.audience);
   const { items, total, page, size } = await listAnnouncements({
     q: searchParams.q,
+    topic: searchParams.topic,
+    age: normalizeAge(searchParams.age),
+    ageKnownOnly: searchParams.ageKnownOnly === "1",
     audience,
     category: searchParams.category ? Number(searchParams.category) : undefined,
     region: searchParams.region,
@@ -63,8 +67,4 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
       <Pagination page={page} size={size} total={total} basePath="/announcements" params={searchParams} />
     </div>
   );
-}
-
-function normalizeAudience(value: string | undefined): AudienceGroup {
-  return value === "business" || value === "worker" || value === "all" ? value : "all";
 }

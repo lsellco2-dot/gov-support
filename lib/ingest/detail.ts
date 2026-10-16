@@ -17,6 +17,10 @@ const SOURCE_HOSTS: Record<SourceCode, string[]> = {
   mss: ["mss.go.kr", "bizinfo.go.kr", "smba.go.kr", "smes.go.kr", "smtech.go.kr"],
   mois: ["gov.kr", "gov24.go.kr"],
   msit: ["msit.go.kr"],
+  "bokji-central": [],
+  "bokji-local": [],
+  enara: [],
+  culture: [],
 };
 
 const SOURCE_SELECTORS: Record<SourceCode, string[]> = {
@@ -26,6 +30,10 @@ const SOURCE_SELECTORS: Record<SourceCode, string[]> = {
   // 정부24 혜택 상세는 .tab-content 패널들이 실제 본문(주요내용/지원대상/지원내용/신청방법)이다.
   mois: [".tab-content", "#contents", ".content", "main", "article"],
   msit: [".board_view", ".view_cont", "#contents", "main"],
+  "bokji-central": [],
+  "bokji-local": [],
+  enara: [],
+  culture: [],
 };
 
 const KSTARTUP_ALTERNATE_SELECTORS = [
@@ -46,6 +54,7 @@ export interface StoredDetailLink {
 }
 
 export interface FetchedAnnouncementDetail {
+  target?: string;
   detailContent: string;
   applyMethod: string | null;
   documents: string | null;
@@ -66,6 +75,7 @@ export class DetailFetchError extends Error {
 export async function fetchAnnouncementDetail(
   announcement: NormalizedAnnouncement
 ): Promise<FetchedAnnouncementDetail> {
+  if (announcement.detail) return announcement.detail;
   const initialUrl = validateDetailUrl(announcement.sourceCode, announcement.detailUrl);
   const { html, finalUrl, status } = await fetchHtml(initialUrl, announcement.sourceCode);
   const $ = load(html);

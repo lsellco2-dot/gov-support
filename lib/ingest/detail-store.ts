@@ -111,7 +111,8 @@ function todayKst() {
 
 export async function fetchAndStoreDetails(
   announcements: NormalizedAnnouncement[],
-  sourceId: number
+  sourceId: number,
+  fetchDetail = fetchAnnouncementDetail,
 ): Promise<DetailStoreResult> {
   let cursor = 0;
   let fetched = 0;
@@ -126,7 +127,7 @@ export async function fetchAndStoreDetails(
       const attemptedAt = new Date().toISOString();
 
       try {
-        const detail = await fetchAnnouncementDetail(announcement);
+        const detail = await fetchDetail(announcement);
         const region =
           announcement.sourceCode === "bizinfo"
             ? inferBizinfoRegion({
@@ -154,6 +155,7 @@ export async function fetchAndStoreDetails(
             detail_fetch_status: "success",
             detail_fetch_error: null,
             ...(region ? { region } : {}),
+            ...(detail.target ? { target: detail.target } : {}),
           })
           .eq("source_id", sourceId)
           .eq("source_key", announcement.sourceKey);

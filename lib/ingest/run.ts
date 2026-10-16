@@ -1,5 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { adapters } from "./adapters";
+import { expandedAdapters } from "./adapters/expanded";
+import { sourcePayloadHash } from "./detail";
 import { mapCategories } from "./category";
 import { contentHash } from "./hash";
 import { SOURCE_ID, type NormalizedAnnouncement } from "./types";
@@ -43,9 +45,10 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
   const serviceKey = process.env.DATA_GO_KR_KEY;
   if (!serviceKey) throw new Error("DATA_GO_KR_KEY 환경변수가 없습니다.");
 
-  const targets = adapters.filter(
+  const targets = [...adapters, ...expandedAdapters].filter(
     (a) => !only || only.length === 0 || only.includes(a.sourceCode)
-  );
+  ).filter(a => !a.requiresLongRunningJob || only?.includes(a.sourceCode))
+    .filter(a => !a.enableEnv || process.env[a.enableEnv] === "true" || only?.includes(a.sourceCode));
 
   const results: IngestResult[] = [];
   const deleteBefore = expiredDeleteBeforeDate();
@@ -68,10 +71,29 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
     const seenMssTitles = new Set<string>();
 
     try {
+      if (adapter.enableEnv && process.env[adapter.enableEnv] !== "true") {
+        throw new Error(`수집 승인 설정 필요: ${adapter.enableEnv}`);
+      }
+      const adapterKey = (adapter.keyEnv && process.env[adapter.keyEnv]) || serviceKey;
+      let sourceId = SOURCE_ID[adapter.sourceCode];
+      if (!sourceId) {
+        const lookup = await supabaseAdmin.from("sources").select("id,enabled").eq("code", adapter.sourceCode).maybeSingle();
+        if (lookup.error) throw new Error("수집처 조회 실패");
+        if (lookup.data?.enabled === false) throw new Error("수집처 비활성 상태");
+        sourceId = lookup.data?.id;
+      }
       if (adapter.sourceCode === "mss") {
         preferredSourceIndex = await loadPreferredSourceDuplicateIndex();
       }
-      for await (const page of adapter.fetchPages({ serviceKey })) {
+      for await (const page of adapter.fetchPages({ serviceKey: adapterKey })) {
+        if (sourceId === undefined) {
+          // Reuse the existing atomic source-ID allocator, only after a successful source response.
+          const registered = await supabaseAdmin.rpc("ensure_source_by_code", {
+            p_code: adapter.sourceCode, p_name: adapter.name ?? adapter.sourceCode,
+          });
+          if (registered.error || !Number.isInteger(registered.data)) throw new Error("수집처 등록 실패: ensure_source_by_code 확인 필요");
+          sourceId = Number(registered.data);
+        }
         const prepared: Array<{
           normalized: NormalizedAnnouncement;
           row: ReturnType<typeof toRow>;
@@ -99,21 +121,22 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
             r.skipped++;
             continue;
           }
-          prepared.push({ normalized: n, row: toRow(n) });
+          prepared.push({ normalized: n, row: toRow(n, sourceId) });
         }
 
         let detailCandidates: NormalizedAnnouncement[] = [];
-        if (detailBudget > 0 && detailSchemaReady !== false && prepared.length > 0) {
+        const remoteDetails = prepared.filter(({ normalized }) => !normalized.detail);
+        if (detailBudget > 0 && detailSchemaReady !== false && remoteDetails.length > 0 && (!adapter.skipHtmlDetails || adapter.fetchDetail)) {
           const lookup = await loadExistingDetailStates(
-            SOURCE_ID[adapter.sourceCode],
-            prepared.map(({ normalized }) => normalized.sourceKey)
+            sourceId,
+            remoteDetails.map(({ normalized }) => normalized.sourceKey)
           );
           detailSchemaReady = lookup.schemaReady;
           r.detailSchemaReady = lookup.schemaReady;
 
           if (lookup.schemaReady && lookup.lookupReady) {
             const eligible: NormalizedAnnouncement[] = [];
-            for (const { normalized } of prepared) {
+            for (const { normalized } of remoteDetails) {
               if (!normalized.detailUrl) {
                 r.detailsSkipped++;
               } else if (needsDetailFetch(normalized, lookup.states.get(normalized.sourceKey))) {
@@ -131,8 +154,14 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
 
         const rows = prepared.map(({ row }) => row);
         const successfulKeys = new Set<string>();
-        for (let i = 0; i < rows.length; i += CHUNK) {
-          const chunk = rows.slice(i, i + CHUNK);
+        // PostgREST batches must not null-fill missing detail fields on other rows.
+        const batches: typeof rows[] = [];
+        for (const withDetail of [true, false]) {
+          const group = rows.filter(row => (row.detail_content !== undefined) === withDetail);
+          for (let i = 0; i < group.length; i += CHUNK) batches.push(group.slice(i, i + CHUNK));
+        }
+        for (const batch of batches) {
+          const chunk = [...new Map(batch.map(row => [row.source_key, row])).values()];
           const { error } = await supabaseAdmin
             .from("announcements")
             .upsert(chunk, { onConflict: "source_id,source_key" });
@@ -141,6 +170,7 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
             console.error(`[${adapter.sourceCode}] upsert 실패:`, error.message);
           } else {
             r.upserted += chunk.length;
+            r.detailsFetched += chunk.filter(row => row.detail_content !== undefined).length;
             for (const row of chunk) successfulKeys.add(row.source_key);
           }
         }
@@ -150,7 +180,8 @@ export async function runIngest(only?: string[]): Promise<IngestResult[]> {
         } else if (detailCandidates.length > 0) {
           const stored = await fetchAndStoreDetails(
             detailCandidates.filter((candidate) => successfulKeys.has(candidate.sourceKey)),
-            SOURCE_ID[adapter.sourceCode]
+            sourceId,
+            adapter.fetchDetail
           );
           r.detailsFetched += stored.fetched;
           r.detailsFailed += stored.failed;
@@ -210,7 +241,7 @@ function expiredDeleteBeforeDate(now = new Date()): string {
   return cutoff.toISOString().slice(0, 10);
 }
 
-function toRow(n: NormalizedAnnouncement) {
+export function toRow(n: NormalizedAnnouncement, sourceId: number) {
   const clean: NormalizedAnnouncement = {
     ...n,
     title: sanitizeDisplayText(n.title),
@@ -226,13 +257,14 @@ function toRow(n: NormalizedAnnouncement) {
     .filter(({ label }) => label.length > 0);
 
   return {
-    source_id: SOURCE_ID[clean.sourceCode],
+    source_id: sourceId,
     source_key: clean.sourceKey,
     title: clean.title,
     organization: clean.organization,
     category_ids: mapCategories(clean),
     region: clean.region ?? "전국",
-    target: clean.target,
+    ...((clean.sourceCode === "bokji-central" || clean.sourceCode === "bokji-local") && n.target === null
+      ? {} : { target: clean.target }),
     support_type: clean.supportType,
     summary: clean.summary,
     apply_start: clean.applyStart,
@@ -240,6 +272,18 @@ function toRow(n: NormalizedAnnouncement) {
     detail_url: clean.detailUrl,
     content_hash: contentHash(clean),
     raw_json: clean.raw,
+    ...(n.detail ? {
+      detail_content: n.detail.detailContent,
+      apply_method: n.detail.applyMethod,
+      documents: n.detail.documents,
+      contact: n.detail.contact,
+      detail_content_hash: n.detail.contentHash,
+      detail_source_hash: sourcePayloadHash(n.raw, n.sourceCode),
+      detail_fetched_at: new Date().toISOString(),
+      detail_fetch_attempted_at: new Date().toISOString(),
+      detail_fetch_status: "success",
+      detail_fetch_error: null,
+    } : {}),
     ...(attachments && attachments.length > 0 ? { attachments } : {}),
     updated_at: new Date().toISOString(),
   };

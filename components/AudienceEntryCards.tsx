@@ -29,6 +29,20 @@ const AUDIENCE_CARDS: Array<{
     buttonLabel: "취업·직장인 공고 보기",
     icon: "🎓",
   },
+  {
+    id: "nonprofit",
+    title: "비영리·복지단체",
+    description: "비영리단체와 복지시설의 활동·운영 지원 공고",
+    buttonLabel: "비영리·단체 공고 보기",
+    icon: "🤝",
+  },
+  {
+    id: "community",
+    title: "주민모임·동아리",
+    description: "주민공동체, 동아리, 생활체육 활동 지원 공고",
+    buttonLabel: "주민모임 공고 보기",
+    icon: "🏘️",
+  },
 ];
 
 export default function AudienceEntryCards({
@@ -50,6 +64,7 @@ export default function AudienceEntryCards({
           <Link
             key={card.id}
             href={hrefFor(basePath, params, card.id)}
+            prefetch={false}
             className="group flex flex-col rounded-lg border border-line bg-white p-6 transition hover:border-primary hover:shadow-[0_2px_12px_rgba(37,110,244,0.12)] focus-visible:border-primary"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary-light text-2xl">
@@ -82,6 +97,7 @@ export default function AudienceEntryCards({
           <Link
             key={card.id}
             href={hrefFor(basePath, params, card.id)}
+            prefetch={false}
             role="tab"
             aria-selected={selected}
             className={[
@@ -104,6 +120,8 @@ export default function AudienceEntryCards({
 function shortLabel(id: AudienceGroup) {
   if (id === "business") return "창업·사업자";
   if (id === "worker") return "취업·직장인";
+  if (id === "nonprofit") return "비영리·단체";
+  if (id === "community") return "주민모임·동아리";
   return "전체";
 }
 
@@ -116,6 +134,9 @@ function hrefFor(
   if (params.q) sp.set("q", params.q);
   if (params.region) sp.set("region", params.region);
   if (params.category) sp.set("category", params.category);
+  if (params.topic) sp.set("topic", params.topic);
+  if (params.age) sp.set("age", params.age);
+  if (params.ageKnownOnly) sp.set("ageKnownOnly", params.ageKnownOnly);
   sp.set("status", params.status ?? "open");
   sp.set("sort", params.sort ?? "latest");
   sp.set("audience", audience);

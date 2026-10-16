@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listAnnouncements } from "@/lib/query/announcements";
+import { listAnnouncements, normalizeAudience } from "@/lib/query/announcements";
+import { normalizeAge } from "@/lib/query/age";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,10 @@ export async function GET(req: NextRequest) {
   try {
     const result = await listAnnouncements({
       q: sp.get("q") ?? undefined,
-      audience: (sp.get("audience") as any) ?? "all",
+      audience: normalizeAudience(sp.get("audience")),
+      topic: sp.get("topic") ?? undefined,
+      age: normalizeAge(sp.get("age")),
+      ageKnownOnly: sp.get("ageKnownOnly") === "1",
       category: sp.get("category") ? Number(sp.get("category")) : undefined,
       region: sp.get("region") ?? undefined,
       status: (sp.get("status") as any) ?? "open",
