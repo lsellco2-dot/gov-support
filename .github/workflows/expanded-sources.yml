@@ -1,0 +1,39 @@
+name: Daily expanded sources
+
+on:
+  schedule:
+    - cron: '17 23 * * *' # 매일 08:17 KST, 실제 시작은 GitHub 대기열에 따라 지연 가능
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-expanded-sources
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.repository == 'lsellco2-dot/gov-support' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: production-ingestion
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [enara, bokji-central, bokji-local]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Collect or enrich public announcements
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.AISUP_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AISUP_SUPABASE_SERVICE_ROLE_KEY }}
+          DATA_GO_KR_KEY: ${{ secrets.AISUP_DATA_GO_KR_KEY }}
+        run: npm run ingest:scheduled -- --source=${{ matrix.source }} --apply

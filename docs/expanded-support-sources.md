@@ -79,7 +79,41 @@ INGEST_ENARA_ENABLED=true npm run ingest:expanded -- --source=enara --all --appl
 ```
 
 위 환경변수 지정은 POSIX 셸 예시다. PowerShell은 `$env:INGEST_ENARA_ENABLED='true'`로 지정한다.
-일일 자동화나 별도 인프라는 이번 작업에서 생성하지 않았다.
+최초 수집 당시에는 일일 자동화를 만들지 않았다. 이후 자동화 설정은 다음 절을 따른다.
+
+## 정기 수집 및 상세 보강 (2026-10-16 추가)
+
+- `.github/workflows/expanded-sources.yml`: 매일 08:17 KST 예약, GitHub Actions 대기열에 따라 지연될 수 있다.
+- e나라도움 전체 CLI 수집과 복지로 중앙/지자체 상세 보강을 서로 독립된 작업으로 실행한다. 각 작업 제한시간 60분.
+- 기존 Vercel 06:00 KST 목록 cron과 07:00 온통청년 cron은 유지한다. e나라도움을 300초 HTTP 함수에 넣지 않는다.
+- 복지로 추가 상세 예산은 중앙 하루 최대 60건, 지자체 최대 400건. 기존 목록 cron의 기본 상세 8건과 목록 요청을 위한 여유를 남긴다.
+- `ingest_daily_jobs`에 KST 날짜/출처별 실행권을 먼저 원자적으로 기록한다. 같은 날 중복/수동 재실행은 API 호출 없이 종료한다.
+- 실패하거나 중간 종료되어도 그날 실행권은 재사용하지 않는다. 실패는 다음 날 다시 시도한다. 강제 종료 기록은 `running`으로 남으므로 Actions 실패/취소 상태도 함께 확인한다.
+- 상세는 미수집 우선, 이전 시도가 오래된 순서로 처리한다. 24시간 내 시도는 제외한다. 목록 payload 변경 또는 상세 수집 후 30일 경과 시 갱신 대상에 포함한다.
+- 상세 API 오류 발생 시 현재 최대 3건 배치 뒤 해당 출처를 멈춘다. 자동 retry 없이 다른 출처는 계속 처리한다.
+- 전체 공고/사용자 데이터는 Actions 로그에 출력하지 않는다. 결과는 건수/소요시간만 남기며 공고 삭제를 실행하지 않는다.
+- 실행권 테이블/RPC는 RLS 활성 + service_role 전용이다. anon/authenticated에는 조회/수정/실행 권한이 없다.
+- GitHub `production-ingestion` 환경에 API/DB 키를 암호화 보관하며 배포 브랜치는 `master`만 허용한다. 코드/문서에는 값이 없다.
+- workflow는 PR/push 이벤트로 실행하지 않는다. 수동 실행은 Actions의 `Daily expanded sources`에서 가능하지만 당일 실행권을 우회하지 않는다.
+- 공공 API 키의 다른 수동 호출/다른 서비스 사용량까지 통제하는 전역 quota 시스템은 아니다. 기존 `ingest:expanded`를 반복 실행하여 별도 예산을 소진하지 말 것.
+- GitHub 공개 저장소는 60일 동안 저장소 활동이 없으면 예약 workflow가 비활성화될 수 있다. 장기 무변경 운영에서는 Actions 활성 상태/실행 기록을 확인한다.
+
+```sh
+# DB 대기열 읽기 전용 확인. 외부 공공 API 호출/DB 저장 없음.
+npm run ingest:scheduled -- --source=bokji-central
+npm run ingest:scheduled -- --source=bokji-local
+
+# 당일 실행권이 남아 있을 때만 실제 수집/보강. 일반 운영은 Actions가 실행한다.
+npm run ingest:scheduled -- --source=enara --apply
+npm run ingest:scheduled -- --source=bokji-central --apply
+npm run ingest:scheduled -- --source=bokji-local --apply
+```
+
+필요 환경변수는 `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATA_GO_KR_KEY`다.
+로컬에서는 기존 환경파일 디렉터리를 `AISUP_ENV_DIR`로 지정할 수 있다. 키 자체는 출력하지 않는다.
+스케줄 중지는 Actions workflow 비활성화로 처리한다. `sources.enabled=false`도 해당 출처 작업을 차단한다.
+테스트: 정책/중복실행/실패처리/권한/워크플로 회귀 테스트를 포함해 178개 통과. 타입검사와 Production build 종료 코드 0.
+운영 실행권 중복 테스트는 트랜잭션 rollback으로 수행하여 실제 일일 실행권을 소진하지 않았다.
 
 ## 표시 및 안전 원칙
 
