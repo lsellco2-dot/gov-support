@@ -1,9 +1,9 @@
 import { loadEnvConfig } from "@next/env";
-import { BOKJI_DAILY_LIMITS, parseScheduledOptions, runClaimedJob, selectBokjiDetails, type BokjiDetailRow } from "../lib/ingest/scheduled-policy";
+import { BOKJI_DAILY_LIMITS, canRecoverEnara, parseScheduledOptions, runClaimedJob, selectBokjiDetails, type BokjiDetailRow } from "../lib/ingest/scheduled-policy";
 
 async function main() {
   loadEnvConfig(process.env.AISUP_ENV_DIR ?? process.cwd());
-  const { source, apply } = parseScheduledOptions(process.argv.slice(2));
+  const { source, apply, recover } = parseScheduledOptions(process.argv.slice(2));
   const { supabaseAdmin: db } = await import("../lib/supabase/server");
   const { bokjiCentral, bokjiLocal } = await import("../lib/ingest/adapters/bokji");
   const { fetchAndStoreDetails } = await import("../lib/ingest/detail-store");
@@ -35,11 +35,23 @@ async function main() {
     if (!process.env[name]) throw new Error("SCHEDULED_ENV_MISSING");
   }
 
+  let recovery: Record<string, unknown> = {};
   const outcome = await runClaimedJob(
     async () => {
       const { data, error } = await db.rpc("claim_daily_ingest_job", { p_job_key: source });
       if (error) throw new Error("SCHEDULED_CLAIM_FAILED");
-      return data as string | null;
+      if (data || !recover) return data as string | null;
+      // 복지로 예산은 우회하지 않는다. e나라도움 실패만 운영자 요청으로 당일 1회 복구한다.
+      const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+      const previous = await db.from("ingest_daily_jobs").select("id,status,started_at,finished_at,summary")
+        .eq("job_key", "enara").eq("run_date", day).single();
+      if (previous.error) throw new Error("SCHEDULED_RECOVERY_READ_FAILED");
+      if (!canRecoverEnara(previous.data.status, previous.data.summary)) return null;
+      recovery = { manualRecovery: true, previousFailure: previous.data };
+      const claimed = await db.from("ingest_daily_jobs").update({ status: "running", started_at: new Date().toISOString(), finished_at: null, summary: recovery })
+        .eq("id", previous.data.id).eq("status", "failed").select("id").maybeSingle();
+      if (claimed.error) throw new Error("SCHEDULED_RECOVERY_CLAIM_FAILED");
+      return claimed.data?.id ?? null;
     },
     async () => {
       if (source === "enara") {
@@ -75,7 +87,7 @@ async function main() {
     async (id, status, result) => {
       const failed = result && "failed" in result && Number(result.failed) > 0;
       const { error } = await db.from("ingest_daily_jobs").update({
-        status: failed ? "failed" : status, finished_at: new Date().toISOString(), summary: result ?? { error: "JOB_FAILED" },
+        status: failed ? "failed" : status, finished_at: new Date().toISOString(), summary: { ...recovery, ...(result ?? { error: "JOB_FAILED" }) },
       }).eq("id", id);
       if (error) throw new Error("SCHEDULED_RESULT_WRITE_FAILED");
     },

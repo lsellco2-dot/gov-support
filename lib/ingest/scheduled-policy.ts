@@ -14,12 +14,19 @@ export interface BokjiDetailRow {
 }
 
 export function parseScheduledOptions(args: string[]) {
-  if (args.some(arg => !/^--source=(enara|bokji-central|bokji-local)$|^--apply$/.test(arg)) ||
+  if (args.some(arg => !/^--source=(enara|bokji-central|bokji-local)$|^--apply$|^--recover-enara$/.test(arg)) ||
       args.filter(arg => arg.startsWith("--source=")).length !== 1 ||
       args.filter(arg => arg === "--apply").length > 1) {
     throw new Error("SCHEDULED_OPTIONS_INVALID");
   }
-  return { source: args.find(arg => arg.startsWith("--source="))!.slice(9) as ScheduledSource, apply: args.includes("--apply") };
+  const source = args.find(arg => arg.startsWith("--source="))!.slice(9) as ScheduledSource;
+  const recover = args.includes("--recover-enara");
+  if (recover && (source !== "enara" || !args.includes("--apply") || args.filter(arg => arg === "--recover-enara").length > 1)) throw new Error("SCHEDULED_OPTIONS_INVALID");
+  return { source, apply: args.includes("--apply"), recover };
+}
+
+export function canRecoverEnara(status: string, summary: Record<string, unknown>) {
+  return status === "failed" && summary.manualRecovery !== true;
 }
 
 export function selectBokjiDetails(rows: BokjiDetailRow[], source: keyof typeof BOKJI_DAILY_LIMITS, now = Date.now()) {

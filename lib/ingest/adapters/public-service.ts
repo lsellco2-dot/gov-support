@@ -52,15 +52,16 @@ export function explicitRegion(value: unknown): string {
 }
 
 /** Fixed public endpoints only. Never log the URL, response body, or API credential. */
-export async function fetchPublicText(url: string): Promise<string> {
-  let response: Response;
+export async function fetchPublicText(url: string, timeoutMs = 15_000): Promise<string> {
+  let text: string;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(15_000), cache: "no-store" });
-  } catch {
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
+    if (!response.ok) throw new Error(`PUBLIC_SOURCE_HTTP_${response.status}`);
+    text = await response.text();
+  } catch (error) {
+    if (error instanceof Error && /^PUBLIC_SOURCE_HTTP_\d+$/.test(error.message)) throw error;
     throw new Error("PUBLIC_SOURCE_NETWORK_ERROR");
   }
-  if (!response.ok) throw new Error(`PUBLIC_SOURCE_HTTP_${response.status}`);
-  const text = await response.text();
   if (text.length > 8_000_000) throw new Error("PUBLIC_SOURCE_RESPONSE_TOO_LARGE");
   return text;
 }

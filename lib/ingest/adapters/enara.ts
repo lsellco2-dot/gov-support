@@ -11,15 +11,16 @@ export const enara: SourceAdapter = {
   async *fetchPages({ serviceKey }) {
     const year = Number(new Intl.DateTimeFormat("en", { timeZone: "Asia/Seoul", year: "numeric" }).format(new Date()));
     const seen = new Set<string>();
-    // Prior-year calls may continue accepting applications in the new year.
-    for (const businessYear of [year - 1, year]) {
+    // 최신 모집 공고를 먼저 반영하고, 전년도 계속 모집 공고도 빠뜨리지 않는다.
+    for (const businessYear of [year, year - 1]) {
       let collected = 0;
       for (let page = 1; page <= 100; page++) {
         const url = buildUrl("https://apis.data.go.kr/1051000/MoefOpenAPI2025/T_OPD_ASBS_PBNS_UNITY", {
           // 2026-10-16 실응답: '%'는 공고명이 있는 행만 반환한다. 무필터 20만여 사업 행 스캔 방지.
           serviceKey, pageNo: page, numOfRows: 500, resultType: "xml", bsnsyear: businessYear, pblanc_nm: "%",
         });
-        const { items, total } = parseServiceXml(await fetchPublicText(url), "item");
+        // 장시간 CLI 전용. 해외 runner에서 원천 응답 본문 수신까지 15초를 넘길 수 있다.
+        const { items, total } = parseServiceXml(await fetchPublicText(url, 45_000), "item");
         checkPageProgress(items, total, collected);
         collected += items.length;
         const calls: typeof items = [];

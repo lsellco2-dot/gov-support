@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { sourcePayloadHash } from "./detail";
-import { BOKJI_DAILY_LIMITS, parseScheduledOptions, runClaimedJob, selectBokjiDetails, type BokjiDetailRow } from "./scheduled-policy";
+import { BOKJI_DAILY_LIMITS, canRecoverEnara, parseScheduledOptions, runClaimedJob, selectBokjiDetails, type BokjiDetailRow } from "./scheduled-policy";
 
 const now = Date.parse("2026-10-16T01:00:00Z");
 const day = 86_400_000;
@@ -13,11 +13,21 @@ function row(id: number, fields: Partial<BokjiDetailRow> = {}): BokjiDetailRow {
 }
 
 test("정기 수집은 기본 dry-run이며 허용 출처/명시 apply만 지원한다", () => {
-  assert.deepEqual(parseScheduledOptions(["--source=enara"]), { source: "enara", apply: false });
+  assert.deepEqual(parseScheduledOptions(["--source=enara"]), { source: "enara", apply: false, recover: false });
   assert.equal(parseScheduledOptions(["--source=bokji-local", "--apply"]).apply, true);
   for (const args of [[], ["--source=mois"], ["--source=enara", "--limit=9999"], ["--source=enara", "--source=enara"]]) {
     assert.throws(() => parseScheduledOptions(args));
   }
+});
+
+test("운영자 복구는 실패한 e나라도움 1회만 허용하고 복지로 일일 예산은 우회하지 않는다", () => {
+  assert.equal(parseScheduledOptions(["--source=enara", "--apply", "--recover-enara"]).recover, true);
+  assert.throws(() => parseScheduledOptions(["--source=bokji-central", "--apply", "--recover-enara"]));
+  assert.throws(() => parseScheduledOptions(["--source=enara", "--recover-enara"]));
+  assert.equal(canRecoverEnara("failed", {}), true);
+  assert.equal(canRecoverEnara("failed", { manualRecovery: true }), false);
+  assert.equal(canRecoverEnara("running", {}), false);
+  assert.equal(canRecoverEnara("success", {}), false);
 });
 
 test("복지로 호출 예산은 중앙 60 / 지방 400을 넘지 않는다", () => {
@@ -77,7 +87,7 @@ test("워크플로는 master 및 보호 환경에서만 실행하고 PR/무제�
 });
 
 test("실행권 테이블은 RLS 및 service_role 전용이고 날짜 UNIQUE로 원자적 중복 차단", () => {
-  const sql = readFileSync("supabase/migrations/20261016011445_scheduled_source_jobs.sql", "utf8");
+  const sql = readFileSync("supabase/migrations/20261016011800_scheduled_source_jobs.sql", "utf8");
   assert.match(sql, /enable row level security/);
   assert.match(sql, /unique \(job_key, run_date\)/);
   assert.match(sql, /security invoker set search_path = ''/);

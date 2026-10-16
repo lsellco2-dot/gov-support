@@ -3,7 +3,7 @@ import test from "node:test";
 import { bokjiCentral, bokjiLocal } from "./bokji";
 import { enara } from "./enara";
 import { culture, parseCultureList } from "./culture";
-import { explicitRegion, parseServiceXml } from "./public-service";
+import { explicitRegion, fetchPublicText, parseServiceXml } from "./public-service";
 import { runIngest, toRow } from "../run";
 import { moisBenefit } from "./mois-benefit";
 
@@ -64,7 +64,18 @@ test("e나라도움 공고명 필터와 동일 공고 중복 제거", async t =>
   for await (const page of enara.fetchPages({ serviceKey: "fixture" })) count += page.length;
   assert.equal(count, 1);
   assert.equal(urls.length, 2);
+  assert.equal(Number(urls[0].searchParams.get("bsnsyear")), Number(urls[1].searchParams.get("bsnsyear")) + 1);
   for (const url of urls) assert.equal(url.searchParams.get("pblanc_nm"), "%");
+});
+
+test("공공 API 본문 수신 timeout도 키/URL 없는 안전 오류로 기록하고 자동 재시도하지 않는다", async t => {
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    return { ok: true, text: async () => { throw new Error("sensitive-provider-url"); } } as unknown as Response;
+  });
+  await assert.rejects(fetchPublicText("https://example.com", 45_000), { message: "PUBLIC_SOURCE_NETWORK_ERROR" });
+  assert.equal(calls, 1);
 });
 const grant = {
   PBLANC_NM: "비영리단체 공익활동 공모", PBLANC_POPUP_URL: "https://www.bojo.go.kr/call?id=example",
