@@ -1,4 +1,5 @@
 import AuthControl from "@/components/AuthControl";
+import OperatorInfo from "@/components/OperatorInfo";
 import { getCurrentAdminAccess } from "@/lib/admin/auth";
 import Link from "next/link";
 
@@ -31,8 +32,9 @@ export default async function WebLayout({ children }: { children: React.ReactNod
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
-      <footer className="mt-10 border-t border-line bg-white py-6 text-center text-xs text-slate-400">
-        <p>본 서비스의 공고 정보는 공공데이터포털(data.go.kr) 공개 API를 통해 수집되었습니다.</p>
+      <footer className="mt-10 border-t border-line bg-white px-4 py-6 text-center text-xs leading-6 text-subtle">
+        <OperatorInfo />
+        <p className="mt-3">공공데이터포털 및 각 제공기관의 공개 자료를 수집·가공해 안내합니다.</p>
         <p className="mt-1">정확한 내용은 반드시 각 공고의 원문을 확인하세요.</p>
         <p className="mt-3 space-x-3">
           <Link href="/privacy" className="text-subtle underline-offset-2 hover:underline">
@@ -42,6 +44,7 @@ export default async function WebLayout({ children }: { children: React.ReactNod
             이용약관
           </Link>
         </p>
+        <p className="mt-2"><Link href="/terms" className="underline underline-offset-2">이용약관 개정 안내 · 2026.11.18 적용</Link></p>
       </footer>
     </div>
   );

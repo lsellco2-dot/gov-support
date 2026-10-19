@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import AppBottomNav from "@/components/AppBottomNav";
 import AuthControl from "@/components/AuthControl";
+import OperatorInfo from "@/components/OperatorInfo";
 import { createAuthServerClient } from "@/lib/supabase/auth-server";
 
 export const metadata: Metadata = {
@@ -37,14 +38,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       <main className="px-3 py-4">
         {children}
-        <footer className="mt-8 pb-2 text-center text-[11px] text-slate-400">
-          <Link href="/privacy" className="underline-offset-2 hover:underline">
-            개인정보처리방침
-          </Link>
-          <span className="mx-2">·</span>
-          <Link href="/terms" className="underline-offset-2 hover:underline">
-            이용약관
-          </Link>
+        <footer className="mt-8 space-y-3 pb-2 text-center text-xs leading-6 text-subtle">
+          <OperatorInfo />
+          <p>
+            <Link href="/privacy" className="underline-offset-2 hover:underline">
+              개인정보처리방침
+            </Link>
+            <span className="mx-2">·</span>
+            <Link href="/terms" className="underline-offset-2 hover:underline">
+              이용약관
+            </Link>
+          </p>
+          <p><Link href="/terms" className="underline underline-offset-2">이용약관 개정 안내 · 2026.11.18 적용</Link></p>
         </footer>
       </main>
       <AppBottomNav />

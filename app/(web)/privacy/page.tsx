@@ -12,9 +12,10 @@ export default function PrivacyPage() {
     <article className="mx-auto max-w-3xl break-words text-ink">
       <p className="text-sm font-semibold text-primary">정부지원AI비서 · AISUP</p>
       <h1 className="mt-2 text-2xl font-bold">개인정보처리방침</h1>
-      <p className="mt-3 text-sm text-subtle">최종 개정일: 2026년 10월 13일</p>
+      <p className="mt-3 text-sm text-subtle">최종 개정일: 2026년 10월 19일</p>
       <p className="mt-5 text-sm leading-7 text-subtle">
-        이 방침은 정부지원AI비서가 운영하는 aisup.co.kr 웹사이트와 Android 앱
+        이 방침은 모루덕 게임즈(대표자 김경덕)가 운영하는 정부지원AI비서의
+        aisup.co.kr 웹사이트와 Android 앱
         (kr.co.govsupport.assistant)에 적용됩니다. 같은 도메인에 게시된 포켓메이트 등
         다른 서비스의 방침과는 별개입니다. 공고 조회는 로그인 없이 이용할 수 있으며,
         선택한 기능에 따라 처리하는 정보가 달라집니다.
