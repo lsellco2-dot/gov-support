@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { supabaseAnon } from "@/lib/supabase/anon";
+import { supabaseAnonCached as supabaseAnon } from "@/lib/supabase/anon";
 
 export const revalidate = 3600;
 

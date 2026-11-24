@@ -1,4 +1,4 @@
-import { supabaseAnon } from "@/lib/supabase/anon";
+import { supabaseAnon, supabaseAnonCached } from "@/lib/supabase/anon";
 import { FIXTURES } from "./fixtures";
 import { keywordFilters, matchesTerms, searchTerms, topicKeywords } from "./discovery";
 import { readWithTimeoutRetry } from "./read-retry";
@@ -473,7 +473,7 @@ export async function getAnnouncement(id: number) {
       | null;
   }
 
-  const { data, error } = await supabaseAnon
+  const { data, error } = await supabaseAnonCached
     .from("announcements")
     .select(
       "id,source_id,source_key,title,organization,category_ids,region,regions,target,support_type,summary,apply_start,apply_end,age_min,age_max,policy_domain,source_status,detail_url,detail_content,apply_method,documents,contact,attachments,detail_fetched_at,raw_json,created_at,sources(code,name)",
