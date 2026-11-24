@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { supabaseAnon } from "@/lib/supabase/anon";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 const SITE_URL = "https://aisup.co.kr";
 const PAGE_SIZE = 1000;

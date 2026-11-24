@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin/", "/api/", "/app/", "/auth/"],
+      disallow: ["/admin/", "/api/", "/app/", "/auth/", "/announcements?"],
     },
     sitemap: "https://aisup.co.kr/sitemap.xml",
     host: "https://aisup.co.kr",

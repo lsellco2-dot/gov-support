@@ -633,7 +633,7 @@ async function fetchKstartupSections(url: string) {
         Accept: "text/html",
         "User-Agent": "gov-support-detail-fetcher/1.0",
       },
-      cache: "no-store",
+      next: { revalidate: 86400 },
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return null;

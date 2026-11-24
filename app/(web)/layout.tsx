@@ -1,16 +1,8 @@
-import AuthControl from "@/components/AuthControl";
+import WebAuthControl from "@/components/WebAuthControl";
 import OperatorInfo from "@/components/OperatorInfo";
-import { getCurrentAdminAccess } from "@/lib/admin/auth";
 import Link from "next/link";
 
-export default async function WebLayout({ children }: { children: React.ReactNode }) {
-  const adminAccess = await getCurrentAdminAccess();
-  const user = adminAccess.user
-    ? {
-        email: adminAccess.user.email,
-        displayName: adminAccess.user.displayName,
-      }
-    : null;
+export default function WebLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
@@ -24,10 +16,7 @@ export default async function WebLayout({ children }: { children: React.ReactNod
             <span className="hidden text-xs text-subtle lg:inline">
               중기부 · 창진원 · 행안부 · 과기부 공고 통합조회
             </span>
-            <AuthControl
-              user={user}
-              isAdmin={adminAccess.status === "authorized"}
-            />
+            <WebAuthControl />
           </div>
         </div>
       </header>

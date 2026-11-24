@@ -5,6 +5,10 @@ import { getSupabasePublicConfig } from "@/lib/supabase/auth-config";
 export async function updateAuthSession(request: NextRequest) {
   const config = getSupabasePublicConfig();
   if (!config) return NextResponse.next({ request });
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-"));
+  if (!hasAuthCookie) return NextResponse.next({ request });
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(config.url, config.key, {

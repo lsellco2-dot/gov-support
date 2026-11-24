@@ -17,7 +17,13 @@ import { isYouthCenterSource } from "@/lib/query/announcement-presentation";
 
 const getCachedAnnouncement = cache(getAnnouncement);
 
-export const dynamic = "force-dynamic";
+// 공고는 하루 한 번 수집되므로 1시간 캐시로 충분하다. 검색 로봇이 같은 공고를
+// 여러 번 열어도 서버는 1시간에 한 번만 다시 그린다.
+export const revalidate = 3600;
+
+export function generateStaticParams() {
+  return [];
+}
 
 export async function generateMetadata({
   params,
